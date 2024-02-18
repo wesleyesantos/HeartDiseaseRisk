@@ -2,3 +2,4 @@ streamlit
 numpy
 pandas
 streamlit_float
+openai

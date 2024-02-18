@@ -2,6 +2,8 @@ import streamlit as st
 import numpy as np
 from streamlit_float import *
 import pandas as pd
+from openai import OpenAI
+
 
 st.set_page_config(layout="wide")
 float_init(theme=True, include_unstable_primary=False)
@@ -46,9 +48,16 @@ contcontcol1.markdown("""
 with col1.container():
     st.subheader("Your results")
 with col1.container(border=True):
+    st.write("Your blood pressure is 120/80, which is abnormaly high")
     data = np.random.randn(10, 1)
     chart_data = pd.DataFrame(np.random.randn(20, 2), columns=["x", "y"])
     st.line_chart(chart_data)
+
+with col1.container(border=True):
+    st.subheader("Cholesterol")
+    st.markdown("<p>High cholesterol is a silent killer</p>", unsafe_allow_html=True)
+    chart_data = pd.DataFrame(np.random.randn(20, 3), columns=["a", "b", "c"])
+    st.area_chart(chart_data)
 
 smokingcontainer = col1.container(border=True)
 col1col1, col1col2 = smokingcontainer.columns([1,1])
@@ -60,6 +69,7 @@ with col1col2.container():
     st.markdown("<p style='text-align: center;' ></p>", unsafe_allow_html=True)
     st.markdown("<h1 style='text-align:center;font-size:2rem; padding:0rem;'>50 %</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center;' >of the current population smokes</p>", unsafe_allow_html=True)
+
 
     
 
@@ -83,66 +93,56 @@ with col2.container(border=True):
     st.markdown("<h4>Shortness of breath</h4>", unsafe_allow_html=True)
 
 
-# with col3.chat_message("user"):
-#     col3.write("Hello 👋")
 
-# with col3.chat_message("assistant"):
-#     col3.write("Hello human")
-#     col3.bar_chart(np.random.randn(30, 3))
+with col3.container(border=True):
+    st.title("ChatGPT-like clone")
 
-contcol3 = col3.container(border=True)
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+    if "openai_model" not in st.session_state:
+        st.session_state["openai_model"] = "gpt-3.5-turbo"
 
-def chat_content():
-    st.session_state['contents'].append(st.session_state.content)
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-if 'contents' not in st.session_state:
-    st.session_state['contents'] = []
-    border = False
-else:
-    border = True
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-with contcol3:
-    with st.container(border=border):
-        with st.container():
-            st.chat_input(key='content', on_submit=chat_content) 
-            button_b_pos = "0rem"
-            button_css = float_css_helper(width="2.2rem", bottom=button_b_pos, transition=0)
-            float_parent(css=button_css)
-        if content:=st.session_state.content:
-            with st.chat_message(name='robot'):
-                for c in st.session_state.contents:
-                    st.write(c)
+    if prompt := st.chat_input("What is up?"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            stream = client.chat.completions.create(
+                model=st.session_state["openai_model"],
+                messages=[
+                    {"role": m["role"], "content": m["content"]}
+                    for m in st.session_state.messages
+                ],
+                stream=True,
+            )
+            response = st.write_stream(stream)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+# def chat_content():
+#     st.session_state['contents'].append(st.session_state.content)
+
+# if 'contents' not in st.session_state:
+#     st.session_state['contents'] = []
+#     border = False
+# else:
+#     border = True
+
+# with contcol3:
+#     with st.container(border=border):
+#         with st.container():
+#             st.chat_input(key='content', on_submit=chat_content) 
+#             button_b_pos = "0rem"
+#             button_css = float_css_helper(width="2.2rem", bottom=button_b_pos, transition=0)
+#             float_parent(css=button_css)
+#         if content:=st.session_state.content:
+#             with st.chat_message(name='robot'):
+#                 for c in st.session_state.contents:
+#                     st.write(c)
                     
-colrow12, colrow22, colrow32 = st.columns([3,3,3])
-data = np.random.randn(10, 1)
-# with colrow12.container(height=400,border=True):
-#     chart_data = pd.DataFrame(np.random.randn(20, 2), columns=["x", "y"])
-
-#     st.line_chart(chart_data)
-
-# # Initialize chat history
-# if "messages" not in st.session_state:
-#     st.session_state.messages = []
-
-# # Display chat messages from history on app rerun
-
-
-# # React to user input
-# if prompt := col3.chat_input("What is up?"):
-#     # Display user message in chat message container
-#     with col3.chat_message("user"):
-#         col3.markdown(prompt)
-#     # Add user message to chat history
-#     st.session_state.messages.append({"role": "user", "content": prompt})
-
-#     response = f"Echo: {prompt}"
-#     # Display assistant response in chat message container
-#     with col3.chat_message("assistant"):
-#         col3.markdown(response)
-#     # Add assistant response to chat history
-#     st.session_state.messages.append({"role": "assistant", "content": response})
-
-# for message in st.session_state.messages:
-#     with col3.chat_message(message["role"]):
-#         col3.markdown(message["content"])
