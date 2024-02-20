@@ -5,8 +5,7 @@ import numpy as np
 import pickle
 import sklearn
 import plotly.graph_objs as go
-import random
-from helperfunctions import *
+from sklearn.preprocessing import OneHotEncoder
 
 from streamlit_float import *
 
@@ -17,32 +16,7 @@ st.set_page_config(layout="wide")
 float_init(theme=True, include_unstable_primary=False)
 
 DATASET_PATH = "heart_2020_cleaned.csv"
-LOG_MODEL_PATH = "logistic_regression.pkl"
-#Gets random row from the dataset
-total_rows= 319796
-if "random_row_index" not in st.session_state:
-    # If not, generate a new random row index and store it in the session state
-    st.session_state.random_row_index = random.randint(0, total_rows - 1)
-
-# Use the stored random row index to read the specific row from the CSV file
-# This ensures the same row is used throughout the session
-random_row_index = st.session_state.random_row_index
-random_row = pd.read_csv(DATASET_PATH, skiprows=random_row_index, nrows=1)
-
-
-BMI = random_row.iloc[0,1]
-smokingcat = random_row.iloc[0,2]
-alcohol = random_row.iloc[0,3]
-strokecat = random_row.iloc[0,4]
-
-diffwalk = random_row.iloc[0,7]
-gender = random_row.iloc[0,8]
-age = random_row.iloc[0,9]
-diabeticcat = random_row.iloc[0,11]
-genhealth = random_row.iloc[0,13]
-sleeptime = random_row.iloc[0,14]
-
-
+LOG_MODEL_PATH = "model.pkl"
 @st.cache_data(persist=True)
 def load_dataset() -> pd.DataFrame:
     heart_df = pl.read_csv(DATASET_PATH)
@@ -52,33 +26,32 @@ def load_dataset() -> pd.DataFrame:
                             columns=heart_df.columns)
     return heart_df
 def user_input_features() -> pd.DataFrame:
-    col1, col2, col3 = col2cont.columns([1.5, 1,1])
     # race = col1cont.selectbox("Race", options=(race for race in heart.Race.unique()))
-    sex = col1.selectbox("Sex", options=(sex for sex in heart.Sex.unique()),index=sex_to_numeric(gender) )
-    age_cat = col1.selectbox("Age category",
-                                   options=(age_cat for age_cat in heart.AgeCategory.unique()), index=age_to_numeric(age))
-    bmi_cat = col1.selectbox("BMI category",
-                                   options=(bmi_cat for bmi_cat in heart.BMICategory.unique()), index=BMI_to_numeric(BMI))
-    sleep_time = col2.number_input("How many hours on average do you sleep?", 0, 24,value=int(sleeptime))
-    gen_health = col1.selectbox("How can you define your general health?",
-                                      options=(gen_health for gen_health in heart.GenHealth.unique()), index=gen_health_to_numeric(genhealth))
+    sex = col2cont.selectbox("Sex", options=(sex for sex in heart.Sex.unique()))
+    age_cat = col2cont.selectbox("Age category",
+                                   options=(age_cat for age_cat in heart.AgeCategory.unique()))
+    bmi_cat = col2cont.selectbox("BMI category",
+                                   options=(bmi_cat for bmi_cat in heart.BMICategory.unique()))
+    sleep_time = col2cont.number_input("How many hours on average do you sleep?", 0, 24, 7)
+    gen_health = col2cont.selectbox("How can you define your general health?",
+                                      options=(gen_health for gen_health in heart.GenHealth.unique()))
     # phys_health = col1cont.number_input("For how many days during the past 30 days was"
     #                                       " your physical health not good?", 0, 30, 0)
     # # ment_health = col1cont.number_input("For how many days during the past 30 days was"
     #                                       " your mental health not good?", 0, 30, 0)
     # phys_act = col1cont.selectbox("Have you played any sports (running, biking, etc.)"
     #                                 " in the past month?", options=("No", "Yes"))
-    smoking = col3.selectbox("Have you smoked at least 100 cigarettes in"
+    smoking = col2cont.selectbox("Have you smoked at least 100 cigarettes in"
                                    " your entire life (approx. 5 packs)?)",
-                                   options=("No", "Yes"), index=smoking_to_numeric(smokingcat))
-    alcohol_drink = col2.selectbox("Do you have more than 14 drinks of alcohol (men)"
-                                         " or more than 7 (women) in a week?", options=("No", "Yes"), index=alcohol_to_numeric(alcohol))
-    stroke = col2.selectbox("Have you ever had a stroke?", options=("No", "Yes"), index=stroke_to_numeric(strokecat))
-    diff_walk = col3.selectbox("Do you have difficulty walking"
-                                     " or climbing stairs?", options=("No", "Yes"), index=diffwalk_to_numeric(diffwalk))
-    diabetic = col3.selectbox("Do you have diabetes?",
-                                    options=(diabetic for diabetic in heart.Diabetic.unique()), index=diabetic_to_numeric(diabeticcat))
-    # asthma = col3.selectbox("Do you have asthma?", options=("No", "Yes"))
+                                   options=("No", "Yes"))
+    alcohol_drink = col2cont.selectbox("Do you have more than 14 drinks of alcohol (men)"
+                                         " or more than 7 (women) in a week?", options=("No", "Yes"))
+    stroke = col2cont.selectbox("Have you ever had a stroke?", options=("No", "Yes"))
+    diff_walk = col2cont.selectbox("Do you have difficulty walking"
+                                     " or climbing stairs?", options=("No", "Yes"))
+    diabetic = col2cont.selectbox("Do you have diabetes?",
+                                    options=(diabetic for diabetic in heart.Diabetic.unique()))
+    asthma = col2cont.selectbox("Do you have asthma?", options=("No", "Yes"))
     # kid_dis = col1cont.selectbox("Do you have kidney disease?", options=("No", "Yes"))
     # skin_canc = col1cont.selectbox("Do you have skin cancer?", options=("No", "Yes"))
     features = pd.DataFrame({
@@ -116,50 +89,78 @@ contcontcol1.markdown("""
                   Welcome to your health dashboard. 
                   Here you can find all the information about your health.""")
 contcol2 = col2.container(border=True)
-
+contcol2.markdown("<p style='text-align: center;' > Your calculated risk is</p>", unsafe_allow_html=True)
+contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem;'>50 %</h1>", unsafe_allow_html=True)
+contcol2.markdown("<p style='text-align: center;' >Considered quite high</p>", unsafe_allow_html=True)
 
 col2.subheader("What If?")
 
 col2cont =  col2.container(border=True)
-#Prediction
+# #Prediction
 
 heart = load_dataset()
-col2topcont = col2cont.container()
-col2topcont1, col2topcont2 = col2topcont.columns([1,1])
-submit = col2topcont1.button("Predict")
+# col2topcont = col2cont.container()
+# submit = col2topcont.button("Predict")
 
 input_df = user_input_features()
-df = pd.concat([input_df, heart], axis=0)
-df = df.drop(columns=["HeartDisease"])
-cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "DiffWalking",
+# df = pd.concat([input_df, heart], axis=0)
+# df = df.drop(columns=["HeartDisease"])
+cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "PhysicalHealth", "MentalHealth", "DiffWalking",
             "Sex", "AgeCategory", "Race", "Diabetic", "PhysicalActivity",
-            "GenHealth", "Asthma", "KidneyDisease", "SkinCancer"]
-for cat_col in cat_cols:
-    dummy_col = pd.get_dummies(df[cat_col], prefix=cat_col)
-    df = pd.concat([df, dummy_col], axis=1)
-    del df[cat_col]
-df = df[:1]
-df.fillna(0, inplace=True)
+            "GenHealth", "SleepTime", "Asthma", "KidneyDisease", "SkinCancer"]
+# for cat_col in cat_cols:
+#     dummy_col = pd.get_dummies(df[cat_col], prefix=cat_col)
+#     df = pd.concat([df, dummy_col], axis=1)
+#     del df[cat_col]
+# df = df[:1]
+# df.fillna(0, inplace=True)
+# log_model = pickle.load(open(LOG_MODEL_PATH, "rb"))
+
+
+# if "previous_state" not in st.session_state:
+#     st.session_state.previous_state = 0
+# if submit:      
+#     prediction_prob = log_model.predict_proba(df)  
+#     delta_calculated = round(round(prediction_prob[0][1] * 100, 2) - st.session_state.previous_state,2)
+#     col2topcont.metric(label="Heart Disease Risk", value=str(round(prediction_prob[0][1] * 100, 2)) + " %", delta= str(delta_calculated) + " %", delta_color="inverse")
+#     st.session_state.previous_state = round(prediction_prob[0][1] * 100, 2)
+
+# #End Prediction
+# Load the saved encoder
+with open('encoder.pkl', 'rb') as file:
+    encoder = pickle.load(file)
+
+# Function to preprocess user input
+def preprocess_input(input_df, encoder, cat_cols):
+    # One-hot encode the categorical columns
+    encoded_cats = encoder.transform(input_df[cat_cols])
+    
+    # Create a DataFrame from the encoded categories
+    cat_feature_names = encoder.get_feature_names_out(cat_cols)
+    encoded_df = pd.DataFrame(encoded_cats, columns=cat_feature_names, index=input_df.index)
+    
+    # Drop the original categorical columns and concatenate the encoded ones
+    input_df = input_df.drop(columns=cat_cols)
+    input_df = pd.concat([input_df, encoded_df], axis=1)
+    
+    # Fill missing values just in case
+    input_df.fillna(0, inplace=True)
+    
+    return input_df
+
+# Assuming 'input_df' is your user input DataFrame and it has the same structure as during training
+processed_df = preprocess_input(input_df, encoder, cat_cols)
+
+# Load your logistic regression model
 log_model = pickle.load(open(LOG_MODEL_PATH, "rb"))
 
-prediction_prob = log_model.predict_proba(df)  
+# Make predictions
+prediction_prob = log_model.predict_proba(processed_df)
 
-if "previous_state" not in st.session_state:
-    st.session_state.previous_state = 0
-if submit:      
-    delta_calculated = round(round(prediction_prob[0][1] * 100, 2) - st.session_state.previous_state,2)
-    col2topcont2.metric(label="Heart Disease Risk", value=str(round(prediction_prob[0][1] * 100, 2)) + " %", delta= str(delta_calculated) + " %", delta_color="inverse")
-    st.session_state.previous_state = round(prediction_prob[0][1] * 100, 2)
-
-#End Prediction
-
-if "prediction" not in st.session_state:
-    st.session_state.prediction = str(round(prediction_prob[0][1] * 100, 2))
-
-contcol2.markdown("<p style='text-align: center;' > Your calculated risk is</p>", unsafe_allow_html=True)
-contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem;'>" + st.session_state.prediction + "%</h1>", unsafe_allow_html=True)
-contcol2.markdown("<p style='text-align: center;' >Considered quite high</p>", unsafe_allow_html=True)
-
+# Display the prediction
+# Note: How you display this depends on the specifics of your application
+st.write("Heart Disease Risk Probability:", prediction_prob[0][1] * 100)
+print(f"Heart Disease Risk Probability: {prediction_prob[0][1] * 100:.2f}%")
 st.markdown(
     """
     <style>
