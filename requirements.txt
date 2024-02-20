@@ -5,3 +5,4 @@ streamlit_float
 openai
 polars
 plotly
+scikit-learn
