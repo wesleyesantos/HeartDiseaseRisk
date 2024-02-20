@@ -1,12 +1,128 @@
 import streamlit as st
-import numpy as np
-from streamlit_float import *
 import pandas as pd
+import polars as pl
+import numpy as np
+import pickle
+import sklearn
+import plotly.graph_objs as go
+
+from streamlit_float import *
+
 from openai import OpenAI
 
 
 st.set_page_config(layout="wide")
 float_init(theme=True, include_unstable_primary=False)
+
+DATASET_PATH = "heart_2020_cleaned.csv"
+LOG_MODEL_PATH = "logistic_regression.pkl"
+@st.cache_data(persist=True)
+def load_dataset() -> pd.DataFrame:
+    heart_df = pl.read_csv(DATASET_PATH)
+    heart_df = heart_df.to_pandas()
+    heart_df = pd.DataFrame(np.sort(heart_df.values, axis=0),
+                            index=heart_df.index,
+                            columns=heart_df.columns)
+    return heart_df
+def user_input_features() -> pd.DataFrame:
+    # race = col1cont.selectbox("Race", options=(race for race in heart.Race.unique()))
+    sex = col2cont.selectbox("Sex", options=(sex for sex in heart.Sex.unique()))
+    age_cat = col2cont.selectbox("Age category",
+                                   options=(age_cat for age_cat in heart.AgeCategory.unique()))
+    bmi_cat = col2cont.selectbox("BMI category",
+                                   options=(bmi_cat for bmi_cat in heart.BMICategory.unique()))
+    sleep_time = col2cont.number_input("How many hours on average do you sleep?", 0, 24, 7)
+    gen_health = col2cont.selectbox("How can you define your general health?",
+                                      options=(gen_health for gen_health in heart.GenHealth.unique()))
+    # phys_health = col1cont.number_input("For how many days during the past 30 days was"
+    #                                       " your physical health not good?", 0, 30, 0)
+    # # ment_health = col1cont.number_input("For how many days during the past 30 days was"
+    #                                       " your mental health not good?", 0, 30, 0)
+    # phys_act = col1cont.selectbox("Have you played any sports (running, biking, etc.)"
+    #                                 " in the past month?", options=("No", "Yes"))
+    smoking = col2cont.selectbox("Have you smoked at least 100 cigarettes in"
+                                   " your entire life (approx. 5 packs)?)",
+                                   options=("No", "Yes"))
+    alcohol_drink = col2cont.selectbox("Do you have more than 14 drinks of alcohol (men)"
+                                         " or more than 7 (women) in a week?", options=("No", "Yes"))
+    stroke = col2cont.selectbox("Did you have a stroke?", options=("No", "Yes"))
+    diff_walk = col2cont.selectbox("Do you have serious difficulty walking"
+                                     " or climbing stairs?", options=("No", "Yes"))
+    diabetic = col2cont.selectbox("Have you ever had diabetes?",
+                                    options=(diabetic for diabetic in heart.Diabetic.unique()))
+    asthma = col2cont.selectbox("Do you have asthma?", options=("No", "Yes"))
+    # kid_dis = col1cont.selectbox("Do you have kidney disease?", options=("No", "Yes"))
+    # skin_canc = col1cont.selectbox("Do you have skin cancer?", options=("No", "Yes"))
+    features = pd.DataFrame({
+        "PhysicalHealth": ["0"],
+        "MentalHealth": ["0"],
+        "SleepTime": [sleep_time],
+        "BMICategory": [bmi_cat],
+        "Smoking": [smoking],
+        "AlcoholDrinking": [alcohol_drink],
+        "Stroke": [stroke],
+        "DiffWalking": [diff_walk],
+        "Sex": [sex],
+        "AgeCategory": [age_cat],
+        "Race": ["White"],
+        "Diabetic": [diabetic],
+        "PhysicalActivity": ["No"],
+        "GenHealth": [gen_health],
+        "Asthma": ["No"],
+        "KidneyDisease": ["No"],
+        "SkinCancer": ["No"]
+    })
+    return features
+# st.set_page_config(
+#     page_title="Heart Disease Prediction App",
+#     page_icon="images/heart-fav.png"
+# )
+st.title("Heart Disease Prediction")
+
+col1, col2, col3 = st.columns([3,3,3])
+data = np.random.randn(10, 1)
+# contcol1 = col1.container()
+contcontcol1 = col1.container(border=True)
+contcontcol1.subheader("Hello, Jane Doe")
+contcontcol1.markdown("""
+                  Welcome to your health dashboard. 
+                  Here you can find all the information about your health.""")
+contcol2 = col2.container(border=True)
+contcol2.markdown("<p style='text-align: center;' > Your calculated risk is</p>", unsafe_allow_html=True)
+contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem;'>50 %</h1>", unsafe_allow_html=True)
+contcol2.markdown("<p style='text-align: center;' >Considered quite high</p>", unsafe_allow_html=True)
+
+col2.subheader("What If?")
+
+col2cont =  col2.container(border=True)
+#Prediction
+
+heart = load_dataset()
+input_df = user_input_features()
+df = pd.concat([input_df, heart], axis=0)
+df = df.drop(columns=["HeartDisease"])
+cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "DiffWalking",
+            "Sex", "AgeCategory", "Race", "Diabetic", "PhysicalActivity",
+            "GenHealth", "Asthma", "KidneyDisease", "SkinCancer"]
+for cat_col in cat_cols:
+    dummy_col = pd.get_dummies(df[cat_col], prefix=cat_col)
+    df = pd.concat([df, dummy_col], axis=1)
+    del df[cat_col]
+df = df[:1]
+df.fillna(0, inplace=True)
+log_model = pickle.load(open(LOG_MODEL_PATH, "rb"))
+
+submit = col2cont.button("Predict")
+
+if "previous_state" not in st.session_state:
+    st.session_state.previous_state = 0
+if submit:      
+    prediction_prob = log_model.predict_proba(df)  
+    delta_calculated = round(round(prediction_prob[0][1] * 100, 2) - st.session_state.previous_state,2)
+    col2cont.metric(label="Heart Disease Risk", value=str(round(prediction_prob[0][1] * 100, 2)) + " %", delta= str(delta_calculated) + " %", delta_color="inverse")
+    st.session_state.previous_state = round(prediction_prob[0][1] * 100, 2)
+
+#End Prediction
 
 st.markdown(
     """
@@ -37,21 +153,15 @@ sidecont3.markdown("<h2 style='text-align: center;' >Gender </h2>", unsafe_allow
 sidecont3.markdown("<p style='text-align: center;' >Female <p>", unsafe_allow_html=True)
 
 
-col1, col2, col3 = st.columns([3,3,3])
-data = np.random.randn(10, 1)
-# contcol1 = col1.container()
-contcontcol1 = col1.container(border=True)
-contcontcol1.subheader("Hello, Jane Doe")
-contcontcol1.markdown("""
-                  Welcome to your health dashboard. 
-                  Here you can find all the information about your health.""")
+
+
 with col1.container():
     st.subheader("Your results")
-with col1.container(border=True):
-    st.write("Your blood pressure is 120/80, which is abnormaly high")
-    data = np.random.randn(10, 1)
-    chart_data = pd.DataFrame(np.random.randn(20, 2), columns=["x", "y"])
-    st.line_chart(chart_data)
+
+    # st.write("Your blood pressure is 120/80, which is abnormaly high")
+    # data = np.random.randn(10, 1)
+    # chart_data = pd.DataFrame(np.random.randn(20, 2), columns=["x", "y"])
+    # st.line_chart(chart_data)
 
 with col1.container(border=True):
     st.subheader("Cholesterol")
@@ -74,23 +184,19 @@ with col1col2.container():
     
 
 
-contcol2 = col2.container(border=True)
-contcol2.markdown("<p style='text-align: center;' > Your calculated risk is</p>", unsafe_allow_html=True)
-contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem;'>50 %</h1>", unsafe_allow_html=True)
-contcol2.markdown("<p style='text-align: center;' >Considered quite high</p>", unsafe_allow_html=True)
 
-with col2.container():
-    st.subheader("Your Risk Over Time")
-with col2.container(border=True):
-    chart_data = pd.DataFrame(np.random.randn(20, 3), columns=["a", "b", "c"])
-    st.bar_chart(chart_data)
-with col2.container(border=True):
-    st.subheader("Early symptoms of a heart attack")
-    st.markdown("<h4>Chest pain or discomfort </h4>", unsafe_allow_html=True)
-    st.markdown("Most heart attacks involve discomfort in the center or left side of the chest that lasts for more than a few minutes or that goes away and comes back. The discomfort can feel like uncomfortable pressure, squeezing, fullness, or pain.")
-    st.markdown("<h4>Feeling weak, light-headed, or faint</h4>", unsafe_allow_html=True)
-    st.markdown("<h4>Pain or discomfort in one or both arms or shoulders.</h4>", unsafe_allow_html=True)
-    st.markdown("<h4>Shortness of breath</h4>", unsafe_allow_html=True)
+# with col2.container():
+#     st.subheader("Your Risk Over Time")
+# with col2.container(border=True):
+#     chart_data = pd.DataFrame(np.random.randn(20, 3), columns=["a", "b", "c"])
+#     st.bar_chart(chart_data)
+# with col2.container(border=True):
+#     st.subheader("Early symptoms of a heart attack")
+#     st.markdown("<h4>Chest pain or discomfort </h4>", unsafe_allow_html=True)
+#     st.markdown("Most heart attacks involve discomfort in the center or left side of the chest that lasts for more than a few minutes or that goes away and comes back. The discomfort can feel like uncomfortable pressure, squeezing, fullness, or pain.")
+#     st.markdown("<h4>Feeling weak, light-headed, or faint</h4>", unsafe_allow_html=True)
+#     st.markdown("<h4>Pain or discomfort in one or both arms or shoulders.</h4>", unsafe_allow_html=True)
+#     st.markdown("<h4>Shortness of breath</h4>", unsafe_allow_html=True)
 
 
 
