@@ -6,7 +6,7 @@ import pickle
 import sklearn
 import plotly.graph_objs as go
 import random
-import streamviz as sv
+# import streamviz as sv
 import matplotlib.pyplot as plt
 
 from helperfunctions import *
