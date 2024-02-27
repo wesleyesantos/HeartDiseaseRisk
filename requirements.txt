@@ -6,3 +6,4 @@ openai
 polars
 plotly
 scikit-learn
+matplotlib
