@@ -19,7 +19,7 @@ from openai import OpenAI
 st.set_page_config(layout="wide")
 # float_init(theme=True, include_unstable_primary=False)
 
-DATASET_PATH = "heart_2020_cleaned.csv"
+DATASET_PATH = "heart_2020_cleaned.parquet"
 LOG_MODEL_PATH = "logistic_regression.pkl"
 #Gets random row from the dataset
 total_rows= 319796
@@ -27,34 +27,44 @@ if "random_row_index" not in st.session_state:
     # If not, generate a new random row index and store it in the session state
     st.session_state.random_row_index = random.randint(0, total_rows - 1)
 
-# Use the stored random row index to read the specific row from the CSV file
-# This ensures the same row is used throughout the session
-random_row_index = st.session_state.random_row_index
-random_row = pd.read_csv(DATASET_PATH, skiprows=random_row_index, nrows=1)
+
+random_person_1 = ["128868","Obese (30.0 <= BMI < +Inf)","Yes","No","No","12.0","10.0","Yes","Male","50-54","White","Yes","No","Poor",6.0,"No","No","No"]
+random_person_2 = ["222411","Overweight (25.0 <= BMI < 30.0)","No","No","No","0.0","0.0","Yes","Male","75-79","White","No","No","Very good",7.0,"No","No","No"]
+random_person_3 = ["222428","Overweight (25.0 <= BMI < 30.0)","Yes","No","No","0.0","1.0","No","Female","70-74","White","No","No","Very good",7.0,"No","No","No"]
+random_person_4 = ["8486","Overweight (25.0 <= BMI < 30.0)","Yes","No","No","15.0","4.0","Yes","Male","35-39","White","No","No","Good",6.0,"No","No","No"]
+random_person_list = [random_person_1, random_person_2, random_person_3, random_person_4]
 
 
-BMI = random_row.iloc[0,1]
-smokingcat = random_row.iloc[0,2]
-alcohol = random_row.iloc[0,3]
-strokecat = random_row.iloc[0,4]
-physicalhealth = random_row.iloc[0,5]
-diffwalk = random_row.iloc[0,7]
-gender = random_row.iloc[0,8]
-age = random_row.iloc[0,9]
-diabeticcat = random_row.iloc[0,11]
-genhealth = random_row.iloc[0,13]
-sleeptime = random_row.iloc[0,14]
-asthma = random_row.iloc[0,15]
+if "chosen_person" not in st.session_state:
+    random_number = random.randint(0, 3)
+    chosen_person = random_person_list[random_number]
+    st.session_state.chosen_person = chosen_person
+
+chosen_person = st.session_state.chosen_person
+patient_num = chosen_person[0]
+BMI = chosen_person[1]
+smokingcat = chosen_person[2]
+alcohol = chosen_person[3]
+strokecat = chosen_person[4]
+physicalhealth = chosen_person[5]
+diffwalk = chosen_person[7]
+gender = chosen_person[8]
+age = chosen_person[9]
+diabeticcat = chosen_person[11]
+genhealth = chosen_person[13]
+sleeptime = chosen_person[14]
+asthma = chosen_person[15]
+
 
 
 @st.cache_data(persist=True)
 def load_dataset() -> pd.DataFrame:
-    heart_df = pl.read_csv(DATASET_PATH)
-    heart_df = heart_df.to_pandas()
-    heart_df = pd.DataFrame(np.sort(heart_df.values, axis=0),
-                            index=heart_df.index,
-                            columns=heart_df.columns)
+    # Assuming you have converted your dataset to Parquet format
+    # and updated the DATASET_PATH to point to the .parquet file
+    parquet_file_path = DATASET_PATH  # Update this to your Parquet file path
+    heart_df = pd.read_parquet(parquet_file_path)
     return heart_df
+
 def user_input_features() -> pd.DataFrame:
     col1, col2 = col2cont.columns([1, 1])
     # race = col1cont.selectbox("Race", options=(race for race in heart.Race.unique()))
@@ -105,6 +115,21 @@ def user_input_features() -> pd.DataFrame:
         "SkinCancer": ["No"]
     })
     return features
+
+def chart_spec_pie(category_counts_dicts):
+    return {
+    "data": {
+        "values": category_counts_dicts  # Use static list of dicts
+    },
+    "width": 200,  # Set the width of the chart
+    "height": 200, # Set the height of the chart
+    "mark": "arc",
+    "encoding": {
+        "theta": {"field": "Count", "type": "quantitative"},
+        "color": {"field": "Category", "type": "nominal", "legend": {"title": "Categories"}}
+    },
+    }
+    
 # st.set_page_config(
 #     page_title="Heart Disease Prediction App",
 #     page_icon="images/heart-fav.png"
@@ -115,7 +140,7 @@ col1, col2, col3 = st.columns([3,3,3])
 data = np.random.randn(10, 1)
 # contcol1 = col1.container()
 contcontcol1 = col1.container(border=True)
-contcontcol1.subheader("Hello, Jane Doe")
+contcontcol1.subheader(f"Hello, Patient {patient_num}")
 contcontcol1.markdown("""
                   Welcome to your health dashboard. 
                   Here you can find all the information about your health.""")
@@ -129,6 +154,8 @@ col2cont =  col2.container(border=True)
 #Prediction
 
 heart = load_dataset()
+
+
 col2topcont = col2cont.container()
 col2topcont1, col2topcont2 = col2topcont.columns([1,1])
 submit = col2topcont1.button("Predict")
@@ -150,6 +177,7 @@ log_model = pickle.load(open(LOG_MODEL_PATH, "rb"))
 prediction_prob = log_model.predict_proba(df)  
 
 if "previous_state" not in st.session_state:
+    #Change this to predicted
     st.session_state.previous_state = 0
 if submit:      
     delta_calculated = round(round(prediction_prob[0][1] * 100, 2) - st.session_state.previous_state,2)
@@ -162,62 +190,8 @@ if "prediction" not in st.session_state:
     st.session_state.prediction = str(round(prediction_prob[0][1] * 100, 2))
     st.session_state.prediction_bool = log_model.predict(df)
 
-# komma = int(round(float(st.session_state.prediction)))/100
-# with contcol2:
-#     st.write(komma)
-#     sv.gauge(komma,sFix="%", gSize="SML", gTheme="white")
 
-# with contcol2:
-#     fig = go.Figure(go.Indicator(
-#     mode="gauge+number",
-#     value=float(st.session_state.prediction),
-#     domain={'x': [0, 1], 'y': [0, 1]},
-#     title={'text': "Heart Disease Risk"},
-#     gauge={
-#         'axis': {'range': [None, 100]},  # Set the range to be always up to 100
-#         'steps': [
-#             {'range': [0, 20], 'color': "green"},
-#             {'range': [20, 40], 'color': "yellow"},
-#             {'range': [40, 100], 'color': "red"}
-#         ],
-#         'bar': {'color': "black"},
-#     },
-#     number={
-#             'valueformat': "2.2f"  # Format the value to two decimal places
-#         },
 
-# ))
-#     fig.update_layout(
-#     margin={'t': 50, 'b': 20, 'l': 20, 'r': 20},  # Reduce margin to make the figure more compact
-#     height=200,  # Set the height of the figure
-#     width=250    # Set the width of the figure
-# )
-
-#     st.plotly_chart(fig, use_container_width=True)
-# names=['Heart Disease Risk', '']
-# size_of_groups=[float(st.session_state.prediction),100-float(st.session_state.prediction)]
-# plt.pie(size_of_groups,labels=names,colors=['red','white'])
-# fig = plt.figure()
-# fig.patch.set_facecolor('#0E1117')  # Set the background color to "#0E1117"
-# plt.rcParams['text.color'] = 'white'
-
-# my_circle=plt.Circle( (0,0), 0.7, color='#0E1117')  # Set the background color to "#0E1117"
-# p=plt.gcf()
-# p.gca().add_artist(my_circle)
-    # library 
-# Data
-
-# Values for the pie chart
-# values = [float(st.session_state.prediction), 100 - float(st.session_state.prediction)]
-# labels = ['Yes', 'No']
-
-# # Create the pie chart
-# fig = go.Figure(data=[go.Pie(labels=labels, values=values)])
-# fig.update_layout(width=400, height=300)
-
-# # Display the pie chart in the Streamlit app
-# with contcol2:
-#     st.plotly_chart(fig)
 
 contcol2.markdown("<p style='text-align: center;' > Your calculated risk is</p>", unsafe_allow_html=True)
 if(st.session_state.prediction_bool == 0):
@@ -298,54 +272,19 @@ with sidecont2:
 with col1.container():
     st.subheader("Your results")
 
-    # st.write("Your blood pressure is 120/80, which is abnormaly high")
-    # data = np.random.randn(10, 1)
-    # chart_data = pd.DataFrame(np.random.randn(20, 2), columns=["x", "y"])
-    # st.line_chart(chart_data)
 
 
-# def plot_gen_health_distribution(heart_df, user_value):
-#     # Create a figure with a dark background
-#     # plt.style.use('dark_background')
-#     fig, ax = plt.subplots(facecolor='#0E1117')
-    
-#     # Histogram for the GenHealth column with a lighter color for visibility
-#     ax.hist(heart_df['BMICategory'], bins=4, alpha=0.7, color='white', label='BMI Distribution')
-    
-#     # Marker for the user's GenHealth value
-#     ax.axvline(x=user_value, color='red', linestyle='--', linewidth=2, label=f'Your BMI ({user_value})')
-    
-#     # Set labels and title with a lighter color
-#     ax.set_xlabel('Physical Health', color='white')
-#     ax.set_ylabel('Number Of People', color='white')
-#     ax.set_title('Physical Health Distribution with Your Value', color='white')
-    
-#     # Change tick colors
-#     for axis in ['top', 'bottom', 'left', 'right']:
-#         ax.spines[axis].set_color('white')
-#     ax.tick_params(axis='x', colors='white')
-#     ax.tick_params(axis='y', colors='white')
-    
-#     # Customize legend to be more visible in dark theme
-#     legend = ax.legend()
-#     for text in legend.get_texts():
-#         text.set_color('white')
-    
-#     # Set the figure's face color to match Streamlit's dark theme background
-#     # Set axes face color to match the overall dark theme
-#     ax.set_facecolor('#0E1117')
-    
-#     return fig
+with col1.container():
+    option = st.selectbox(
+        "What Graph would you like to see?",
+        ("BMI", "Smoking", "Sleep Time", "General Health", "Alcohol Drinking", "Stroke", "Difficulty Walking", "Diabetic"),
+        placeholder="Select a Graph to display",
+    )
 
-
-# with col1.container(border=True):
-#     st.subheader("Physical Health Distribution")
-#     st.write(physicalhealth)
-#     fig = plot_gen_health_distribution(heart, BMI)
-#     st.pyplot(fig)
-
-
-bar_chart_spec = {
+# Assuming 'heart' is your DataFrame and 'col1' is a defined Streamlit container
+if option == "BMI":    
+    with col1.container(border=True):
+        bar_chart_spec = {
     "layer": [
         {
             "mark": "bar",
@@ -358,143 +297,208 @@ bar_chart_spec = {
                     "sort": ["Underweight (BMI < 18.5)", "Normal weight (18.5 <= BMI < 25.0)", "Overweight (25.0 <= BMI < 30.0)", "Obese (30.0 <= BMI < +Inf)"]
                 },
                 "y": {
-                    "aggregate": "count",
+                    "field": "count",
                     "type": "quantitative",
                     "title": "Number of People"
                 }
             }
         },
         {
-            "mark": {"type": "rule", "tooltip": {"content": BMI}},
+    "mark": {"type": "rule", "color": "red", "size": 2},  # Red line configuration
+    "encoding": {
+        "x": {
+            "field": "BMICategory",  # Ensuring this matches the bar chart's field
+            "type": "nominal",
+            "datum": BMI  # The specific category you're highlighting
+        },
+        "tooltip": {
+            "value": f"Your BMI category is {BMI}"  # Custom tooltip message
+        }
+    }
+}
+    ]
+    }
+
+    # Manually set values for each category
+        bmi_values = {
+        "Underweight (BMI < 18.5)": 5110,
+        "Normal weight (18.5 <= BMI < 25.0)": 97331,
+        "Overweight (25.0 <= BMI < 30.0)": 114512,
+        "Obese (30.0 <= BMI < +Inf)": 102842
+        }
+# Create a DataFrame from the static values
+        static_data = pd.DataFrame(list(bmi_values.items()), columns=['BMICategory', 'count'])
+        st.markdown(f"The red line is your BMI category: :red[{BMI}]]")
+        st.vega_lite_chart(static_data, bar_chart_spec, use_container_width=True)
+
+if option == "General Health":
+    with col1.container(border=True):
+        bar_chart_spec = {
+    "layer": [
+        {
+            "mark": "bar",
             "encoding": {
                 "x": {
-                    "field": "BMICategory",  # The field must match the one used in the bar chart
+                    "field": "GeneralHealth",
                     "type": "nominal",
-                    # Specify the category you want to highlight. This assumes you have a way to set it.
-                    "datum": BMI  # Example: Highlighting the "Overweight" category
+                    "title": "General Health",
+                    "axis": {"labelAngle": 0},
+                    "sort": ["Poor", "Fair", "Good", "Very good", "Excellent"]
                 },
-                "color": {
-                    "value": "red"  # Color of the rule
-                },
-                "size": {
-                    "value": 2  # Width of the rule line
+                "y": {
+                    "field": "count",
+                    "type": "quantitative",
+                    "title": "Number of People"
                 }
             }
-        }
-    ]
-}
-
-
-
-# Assuming 'heart' is your DataFrame and 'col1' is a defined Streamlit container
-with col1.container(border=True):
-    st.markdown(f"The red line is your BMI category: :red[{BMI}]")
-
-    st.vega_lite_chart(heart, bar_chart_spec,use_container_width=True)
-
-
-smokingcontainer = col1.container(border=True)
-col1col1, col1col2 = smokingcontainer.columns([1,1])
-
-category_counts = heart['Smoking'].value_counts().reset_index()
-category_counts.columns = ['Category', 'Count']
-category_counts_dicts = category_counts.to_dict('records')
-pie_chart_spec = {
-    "data": {
-        "values": category_counts_dicts  # Convert the DataFrame to a list of dicts
-    },
-    "width": 200,   # Set the width of the chart
-    "height": 200, # Set the height of the chart
-    "mark": "arc",
+        },
+        {
+    "mark": {"type": "rule", "color": "red", "size": 2},  # Red line configuration
     "encoding": {
-        "theta": {"field": "Count", "type": "quantitative"},
-        "color": {"field": "Category", "type": "nominal", "legend": {"title": "Categories"}}
-    },
+        "x": {
+            "field": "GeneralHealth",  # Ensuring this matches the bar chart's field
+            "type": "nominal",
+            "datum": genhealth  # The specific category you're highlighting
+        },
+        "tooltip": {
+            "value": f"Your general health is {genhealth}"  # Custom tooltip message
+        }
+    }
 }
-no_smoking = category_counts_dicts[0]['Count']
-yes_smoking = category_counts_dicts[1]['Count']
-percentage = round((yes_smoking / (yes_smoking + no_smoking)) * 100, 2)
-# Use Streamlit's vega_lite_chart method to render the pie chart
 
-with smokingcontainer.container():
-    st.subheader("Smoking")
-    st.markdown("<p>Smoking triples your heart disease risk.</p>", unsafe_allow_html=True)
+
+    ]
+    }
+        gen_values = {
+        "Excellent": 66842,
+        "Very good": 113858,
+        "Good": 93128,
+        "Fair": 34677,
+        "Poor": 11289
+        }   
+# Create a DataFrame from the static values
+        static_data = pd.DataFrame(list(gen_values.items()), columns=['GeneralHealth', 'count'])
+        st.markdown(f"The red line is your General Health category: :red[{genhealth}]")
+        st.vega_lite_chart(static_data, bar_chart_spec, use_container_width=True)
+
+
+
+
+
+if option == "Diabetes":
+    category_counts_dicts = [
+    {"Category": "No", "Count": 269653},
+    {"Category": "Yes", "Count": 40802},
+    {"Category": "No, borderline diabetes", "Count": 6781},
+    {"Category": "Yes (during pregnancy)", "Count": 2559}
+    ]
+
+    pie_chart_spec = chart_spec_pie(category_counts_dicts)
+    # Static values for the calculation
+    no_smoking = category_counts_dicts[0]['Count']
+    yes_smoking = category_counts_dicts[1]['Count']
+    percentage = round((yes_smoking / (yes_smoking + no_smoking)) * 100, 2)
+     # Adjusted for example completeness
+    with col1.container(border=True):
+        st.subheader("Diabetes")        
+        # if diabeticcat == "Yes":
+        #     st.markdown(f"<p style='color: red;'>You are part of the {percentage}% that has had a stroke.</p>", unsafe_allow_html=True)
+        # if diabeticcat == "No":
+        #     st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that hasn't had a stroke.</p>", unsafe_allow_html=True)
+        # if diabeticcat == "No, borderline diabetes":
+        #     st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that hasn't had a stroke.</p>", unsafe_allow_html=True)
+        # if diabeticcat == "Yes (during pregnancy)":
+        #     st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that hasn't had a stroke.</p>", unsafe_allow_html=True)
+        st.vega_lite_chart(pie_chart_spec, use_container_width=True)
     
-    if smokingcat == "Yes":
-        st.markdown(f"<p style='color: red;'>You are part of the {percentage}% that smokes</p>", unsafe_allow_html=True)
-    else:
-        st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that doesn't smoke</p>", unsafe_allow_html=True)
-    st.vega_lite_chart(pie_chart_spec, use_container_width=True)
+if option == "Stroke":
+    category_counts_dicts = [
+    {"Category": "No", "Count": 307726},
+    {"Category": "Yes", "Count": 12069}
+    ]
 
-
+    pie_chart_spec = chart_spec_pie(category_counts_dicts)
+    # Static values for the calculation
+    no_smoking = category_counts_dicts[0]['Count']
+    yes_smoking = category_counts_dicts[1]['Count']
+    percentage = round((yes_smoking / (yes_smoking + no_smoking)) * 100, 2)
+     # Adjusted for example completeness
+    with col1.container(border=True):
+        st.subheader("Stroke")        
+        if strokecat == "Yes":
+            st.markdown(f"<p style='color: red;'>You are part of the {percentage}% that has had a stroke.</p>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that hasn't had a stroke.</p>", unsafe_allow_html=True)
+        st.vega_lite_chart(pie_chart_spec, use_container_width=True)
     
 
+if option == "Alcohol Drinking":
+    category_counts_dicts = [
+    {"Category": "No", "Count": 298018},
+    {"Category": "Yes", "Count": 21777}
+    ]
+
+    pie_chart_spec = chart_spec_pie(category_counts_dicts)
+    # Static values for the calculation
+    no_smoking = category_counts_dicts[0]['Count']
+    yes_smoking = category_counts_dicts[1]['Count']
+    percentage = round((yes_smoking / (yes_smoking + no_smoking)) * 100, 2)
+     # Adjusted for example completeness
+    with col1.container(border=True):
+        st.subheader("Alcohol Drinking")        
+        if alcohol == "Yes":
+            st.markdown(f"<p style='color: red;'>You are part of the {percentage}% that drinks.</p>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that doesn't drink.</p>", unsafe_allow_html=True)
+        st.vega_lite_chart(pie_chart_spec, use_container_width=True)
+
+if option == "Difficulty Walking":
+    category_counts_dicts = [
+    {"Category": "No", "Count": 275385},
+    {"Category": "Yes", "Count": 44410}
+    ]
+
+    pie_chart_spec = chart_spec_pie(category_counts_dicts)
+    # Static values for the calculation
+    no_diff = category_counts_dicts[0]['Count']
+    yes_diff = category_counts_dicts[1]['Count']
+    percentage = round((yes_diff / (yes_diff + no_diff)) * 100, 2)
+     # Adjusted for example completeness
+    with col1.container(border=True):
+        st.subheader("Difficulty Walking")        
+        if diffwalk == "Yes":
+            st.markdown(f"<p style='color: red;'>You are part of the {percentage}% that has difficulty walking.</p>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that doesn't have difficulty walking.</p>", unsafe_allow_html=True)
+        st.vega_lite_chart(pie_chart_spec, use_container_width=True)
 
 
-# with col2.container():
-#     st.subheader("Your Risk Over Time")
-# with col2.container(border=True):
-#     chart_data = pd.DataFrame(np.random.randn(20, 3), columns=["a", "b", "c"])
-#     st.bar_chart(chart_data)
-# with col2.container(border=True):
-#     st.subheader("Early symptoms of a heart attack")
-#     st.markdown("<h4>Chest pain or discomfort </h4>", unsafe_allow_html=True)
-#     st.markdown("Most heart attacks involve discomfort in the center or left side of the chest that lasts for more than a few minutes or that goes away and comes back. The discomfort can feel like uncomfortable pressure, squeezing, fullness, or pain.")
-#     st.markdown("<h4>Feeling weak, light-headed, or faint</h4>", unsafe_allow_html=True)
-#     st.markdown("<h4>Pain or discomfort in one or both arms or shoulders.</h4>", unsafe_allow_html=True)
-#     st.markdown("<h4>Shortness of breath</h4>", unsafe_allow_html=True)
+if option == "Smoking":
+    category_counts_dicts = [
+    {"Category": "No", "Count": 187887},
+    {"Category": "Yes", "Count": 131908}
+    ]
 
+    pie_chart_spec = chart_spec_pie(category_counts_dicts)
+    # Static values for the calculation
+    no_smoking = category_counts_dicts[0]['Count']
+    yes_smoking = category_counts_dicts[1]['Count']
+    percentage = round((yes_smoking / (yes_smoking + no_smoking)) * 100, 2)
+     # Adjusted for example completeness
+    with col1.container(border=True):
+        st.subheader("Smoking")
+        st.markdown("<p>Smoking triples your heart disease risk.</p>", unsafe_allow_html=True)
+        
+        if smokingcat == "Yes":
+            st.markdown(f"<p style='color: red;'>You are part of the {percentage}% that smokes</p>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that doesn't smoke</p>", unsafe_allow_html=True)
+        st.vega_lite_chart(pie_chart_spec, use_container_width=True)
 
 
 with col3.container(border=True):
-    st.title("ChatGPT-like clone")
+    st.title("HeartGPT")
+    st.markdown("<p>Here you can ask any questions you have about your health. The AI will try to answer them to the best of its ability.</p>", unsafe_allow_html=True)
+    st.markdown("""<iframe src="https://vanherwegentim-chatbot-app-ci68bm.streamlit.app/?embed_options=disable_scrolling,show_padding,show_colored_line,show_toolbar,show_footer&embed=true" height="600" style="width: 100%; border: none;"></iframe>""", unsafe_allow_html=True)
 
-    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-    if "openai_model" not in st.session_state:
-        st.session_state["openai_model"] = "gpt-3.5-turbo"
-
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if prompt := st.chat_input("What is up?"):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            stream = client.chat.completions.create(
-                model=st.session_state["openai_model"],
-                messages=[
-                    {"role": m["role"], "content": m["content"]}
-                    for m in st.session_state.messages
-                ],
-                stream=True,
-            )
-            response = st.write_stream(stream)
-        st.session_state.messages.append({"role": "assistant", "content": response})
-# def chat_content():
-#     st.session_state['contents'].append(st.session_state.content)
-
-# if 'contents' not in st.session_state:
-#     st.session_state['contents'] = []
-#     border = False
-# else:
-#     border = True
-
-# with contcol3:
-#     with st.container(border=border):
-#         with st.container():
-#             st.chat_input(key='content', on_submit=chat_content) 
-#             button_b_pos = "0rem"
-#             button_css = float_css_helper(width="2.2rem", bottom=button_b_pos, transition=0)
-#             float_parent(css=button_css)
-#         if content:=st.session_state.content:
-#             with st.chat_message(name='robot'):
-#                 for c in st.session_state.contents:
-#                     st.write(c)
-                    
+    
