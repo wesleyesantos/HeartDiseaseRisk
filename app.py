@@ -27,6 +27,7 @@ selected = option_menu(
     icons=["house", "book", "envelope"],
     menu_icon="cast",
     orientation="horizontal",
+    default_index=1,
 )
 st.markdown(
         """
@@ -188,12 +189,6 @@ if selected == "Dashboard":
         },
         }
         
-    # st.set_page_config(
-    #     page_title="Heart Disease Prediction App",
-    #     page_icon="images/heart-fav.png"
-    # )
-    st.title("Heart Disease Prediction")
-
     col1, col2, col3 = st.columns([3,3,3])
     data = np.random.randn(10, 1)
     # contcol1 = col1.container()
@@ -629,7 +624,7 @@ if selected == "Dashboard":
             if cfs_list[0] != BMI:
                 with st.container(border=True):
                     st.markdown("<h5>Factor - BMI</h5>", unsafe_allow_html=True)
-                    st.markdown("Action - Reduce your weight" + cfs_list[0] + BMI)
+                    st.markdown("Action - Reduce your weight")
                     st.markdown(BMI + " => " + cfs_list[0])
             if cfs_list[1] != smokingcat:
                 with st.container(border=True):
