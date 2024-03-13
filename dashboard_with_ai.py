@@ -65,7 +65,7 @@ def load_dashboard_with_ai():
             "values": category_counts_dicts  # Use static list of dicts
         },
         "width": 200,  # Set the width of the chart
-        "height": 200, # Set the height of the chart
+        "height": 150, # Set the height of the chart
         "mark": "arc",
         "encoding": {
             "theta": {"field": "Count", "type": "quantitative"},
@@ -73,14 +73,15 @@ def load_dashboard_with_ai():
         },
         }
         
-    col1, col2 = st.columns([3,3])
-    # contcol1 = col1.container()
-    contcontcol1 = col1.container(border=True)
+    col1, col2 = st.columns([3,2])
+    colcol1, colcol2 = col1.columns([3,2])
+    contcontcol1 = colcol1.container(border=True)
     contcontcol1.subheader(f"Hello, Patient {patient_num}")
     contcontcol1.markdown("""
                     Welcome to your health dashboard. 
                     Here you can find all the information about your health. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
-    contcol2 = col2.container(border=True)
+    
+    contcol2 = colcol2.container(border=True)
 
 
 
@@ -194,6 +195,7 @@ def load_dashboard_with_ai():
         "layer": [
             {
                 "mark": "bar",
+                "height": 200,
                 "encoding": {
                     "x": {
                         "field": "BMICategory",
@@ -243,6 +245,7 @@ def load_dashboard_with_ai():
         "layer": [
             {
                 "mark": "bar",
+                "height": 200,
                 "encoding": {
                     "x": {
                         "field": "GeneralHealth",
@@ -403,8 +406,9 @@ def load_dashboard_with_ai():
 
 
     with col2.container(border=True):
+        st.subheader("Your Heart Health Assistant")
         st.markdown("<p>Here you can ask any questions you have about your health. The AI will try to answer them to the best of its ability.</p>", unsafe_allow_html=True)
-        st.markdown("""<iframe src="https://vanherwegentim-chatbot-app-ci68bm.streamlit.app/?embed_options=disable_scrolling,show_padding,show_colored_line,show_toolbar,show_footer&embed=true" height="550" style="width: 100%; border: none;"></iframe>""", unsafe_allow_html=True)
+        st.markdown("""<iframe src="https://vanherwegentim-chatbot-app-ci68bm.streamlit.app/?embed_options=disable_scrolling,show_padding,show_colored_line,show_toolbar,show_footer&embed=true" height="650" style="width: 100%; border: none;"></iframe>""", unsafe_allow_html=True)
 
 
     

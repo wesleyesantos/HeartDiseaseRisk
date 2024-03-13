@@ -20,6 +20,8 @@ from streamlit_option_menu import option_menu
 from helperfunctions import *
 from dashboard_with_ai import load_dashboard_with_ai
 import math
+import lightgbm as lgb
+
 st.set_page_config(layout="wide")
 
 selected = option_menu(
@@ -29,6 +31,10 @@ selected = option_menu(
     menu_icon="cast",
     orientation="horizontal",
     default_index=1,
+    styles={
+        "container":{"max-width":"100%", "padding":"0"},
+        
+    }
 )
 st.markdown(
         """
@@ -50,29 +56,53 @@ st.markdown(
 # float_init(theme=True, include_unstable_primary=False)
 
 if selected == "Home":
-    st.title("Home")
+    col1, col2, _ = st.columns([1, 2,1])
+    col2.title("Heart Health Advisor")
+    col2.subheader("Welcome to the Heart Health Advisor")
+    col2.markdown("""At HeartBeat, we're dedicated to empowering you on your journey to heart health.
+                   Our user-friendly app combines cutting-edge technology with personalized insights to help you understand and manage your heart disease risk. 
+                  From clear explanations to easily understandable advice, we hope to assist you in your journey towards a healthy future.""")
+    with col1.container():
+        st.image("images/handholding.png")
 if selected == "Dashboard":
     DATASET_PATH = "heart_2020_cleaned.parquet"
     LOG_MODEL_PATH = "logistic_regression.pkl"
     #Gets random row from the dataset
     total_rows= 319796
-    if "random_row_index" not in st.session_state:
-        # If not, generate a new random row index and store it in the session state
-        st.session_state.random_row_index = random.randint(0, total_rows - 1)
 
+    st.sidebar.image('pictures/stock_placeholder.jpg', width=100)
+    st.sidebar.markdown("<h1 style='text-align: center;' >Patient </h1>", unsafe_allow_html=True)
+
+    option = st.sidebar.selectbox(
+    'Patient',
+    ('44', '222460','128868'), index=2, label_visibility="collapsed")
+    if(option == '44'):
+        num = 2
+    if(option == '222460'):
+        num = 1
+    if(option == '128868'):
+        num = 0
+    st.session_state.num = num
+    
+    if 'num' not in st.session_state:
+        num=0
+    else:
+        num = st.session_state.num
+
+    
 
     random_person_1 = ["128868","Obese (30.0 <= BMI < +Inf)","Yes","No","No",12.0,10.0,"Yes","Male","50-54","White","Yes","No","Poor",6.0,"No","No","No"]
-    random_person_3 = ["222460","Overweight (25.0 <= BMI < 30.0)","Yes","Yes","No",10.0,30.0,"Yes","Male","75-79","White","Yes","No","Very Poor",10.0,"No","No","No"]
-    random_person_5 = ["44","Overweight (25.0 <= BMI < 30.0)","Yes","Yes","Yes",10.0,30.0,"Yes","Female","80 or older","White","Yes","No","Fair",7.0,"No","No","No"]
+    random_person_3 = ["222460","Overweight (25.0 <= BMI < 30.0)","Yes","Yes","No",10.0,30.0,"Yes","Male","75-79","White","Yes","No","Poor",10.0,"No","No","No"]
+    random_person_5 = ["44","Overweight (25.0 <= BMI < 30.0)","No","Yes","No",10.0,30.0,"Yes","Female","65-69","White","Yes","No","Poor",4.0,"Yes","Yes","Yes"]
     random_person_list = [random_person_1, random_person_3, random_person_5]
 
 
-    if "chosen_person" not in st.session_state:
-        random_number = random.randint(0, 2)
+    random_number = num
 
-        chosen_person = random_person_list[random_number]
-        st.session_state.chosen_person = chosen_person
-    chosen_person = st.session_state.chosen_person
+    chosen_person = random_person_list[random_number]
+    st.session_state.chosen_person = chosen_person
+
+    
     patient_num = chosen_person[0]
     BMI = chosen_person[1]
     smokingcat = chosen_person[2]
@@ -200,6 +230,55 @@ if selected == "Dashboard":
                     Here you can find all the information about your health. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
     contcol2 = col2.container(border=True)
 
+    def parse_counterfactuals(inference_data, cfe_raw):
+        """
+        Apply additonal boundary conditions
+        # BMICategory should not go higher
+        # Sleeptime should be higher or equal
+        # if 0, it should stay as 0 for smoking and alcohol
+        # if 1, it should stay as 1 for physical activity
+        """
+        bmicats = ["Underweight (BMI < 18.5)", "Normal weight (18.5 <= BMI < 25.0)", 
+               "Overweight (25.0 <= BMI < 30.0)", "Obese (30.0 <= BMI < +Inf)"]
+        # Assuming inference_data is a DataFrame and we're interested in the first row
+        initial_bmi_category = inference_data["BMICategory"].iloc[0]
+        initial_sleep_time = float(inference_data["SleepTime"].iloc[0])
+        initial_smoking = inference_data["Smoking"].iloc[0]
+        initial_alcohol = inference_data["AlcoholDrinking"].iloc[0]
+        
+        index_value1 = bmicats.index(initial_bmi_category)
+        
+        # To be dropped indices
+        to_drop = []
+        for ind, row in cfe_raw.iterrows():
+
+            current_index = bmicats.index(row["BMICategory"])
+            if initial_smoking == "No":
+                row["Smoking"] = "No"
+                
+            if initial_alcohol == "No":
+                row["AlcoholDrinking"] = "No"
+            # If current BMI category is higher than the initial, mark for dropping
+            if current_index > index_value1:
+                to_drop.append(ind)
+                continue  # Move to the next row
+            
+            # If SleepTime is not greater or equal to the initial, mark for dropping
+            if float(row["SleepTime"]) < initial_sleep_time:
+                to_drop.append(ind)
+                continue
+            
+            
+        
+        # Drop the rows outside the loop
+        cfe_raw.drop(labels=to_drop, axis=0, inplace=True)
+        cfe_raw.drop_duplicates(subset=None, inplace=True)
+        return cfe_raw
+
+
+
+
+
 
         #Creating counterfactuals
     def drop_not_wanted_features(df, features_to_drop, target_variable):
@@ -215,7 +294,6 @@ if selected == "Dashboard":
         
         return df
 
-    @st.cache_data(persist=True)
     def load_counterfactuals():
         dataset = pd.read_parquet('heart_2020_cleaned.parquet')
         target = dataset["HeartDisease"]
@@ -226,21 +304,15 @@ if selected == "Dashboard":
                                                                         stratify=target)
         d = dice_ml.Data(dataframe=train_dataset, continuous_features=['PhysicalHealth', 'MentalHealth','SleepTime'], outcome_name='HeartDisease')
         feature_ranges = {'SleepTime': (4,10), 'BMICategory':('Obese (30.0 <= BMI < +Inf)', 'Normal weight (18.5 <= BMI < 25.0)', 'Overweight (25.0 <= BMI < 30.0)')}
-        model = load("counterfactual_model.joblib")
+        model = load("pipeline.joblib")
         m = dice_ml.Model(model=model, backend="sklearn")
         exp = dice_ml.Dice(d, m, method="random") #use methid="random" for faster generation
-        e1 = exp.generate_counterfactuals(random_features, total_CFs=1, permitted_range=feature_ranges, desired_class="opposite", proximity_weight=1.5, diversity_weight=2.0, features_to_vary=["BMICategory", "Smoking", "AlcoholDrinking", "DiffWalking","PhysicalActivity", "GenHealth"])
-        e1_json = e1.to_json()
+        e1 = exp.generate_counterfactuals(random_features, total_CFs=10, permitted_range=feature_ranges, desired_class="opposite", proximity_weight=1.5, diversity_weight=2.0, features_to_vary=["BMICategory", "Smoking", "SleepTime", "AlcoholDrinking", "DiffWalking","PhysicalActivity", "GenHealth"])
+        cfe_json = json.loads(e1.to_json())        
+        cfe_df = pd.DataFrame(cfe_json['cfs_list'][0],columns=cfe_json['feature_names_including_target'])
+        return cfe_df
+   
 
-        # If `e1_json` is a string, convert it to a dictionary
-        if isinstance(e1_json, str):
-            e1_dict = json.loads(e1_json)
-        else:
-            e1_dict = e1_json  # If it's already a dict, no need to parse
-        cfs_list = e1_dict.get('cfs_list')
-        cfs_list = cfs_list[0][0]
-        return cfs_list
-        # Retrieve the cfs_list
         
 
     class Droper(BaseEstimator, TransformerMixin):
@@ -258,13 +330,36 @@ if selected == "Dashboard":
             x = X.copy()
             return drop_not_wanted_features(x, self.features_to_drop, self.target_variable)
 
+    def generate_and_parse_counterfactuals(random_features):
+        max_retries = 50 # Maximum number of attempts
+        retries = 0
+        
+        while retries < max_retries:
+            # Attempt to load and parse counterfactuals
+            cfs_list = load_counterfactuals()
+            cfs_list = parse_counterfactuals(random_features, cfs_list)
+            
+            # Check if counterfactuals list is not empty
+            if not cfs_list.empty:  # Assuming cfs_list is a DataFrame; adjust condition if it's a list
+                print("Successfully generated counterfactuals.")
+                return cfs_list
+            else:
+                print(f"No counterfactuals found on attempt {retries + 1}. Retrying...")
+                retries += 1
+        
+        print("Failed to generate non-empty counterfactuals after maximum retries.")
+        return None  # or return an empty DataFrame/list as per your design
+
+    # Use the function with your random_features DataFrame
+    cfs_list = generate_and_parse_counterfactuals(random_features)
+    
 
     
-    cfs_list = load_counterfactuals()
+    
     with col2.container():
         st.subheader("Counterfactuals")
         st.markdown("<p>Here you can see what changes you can make to your lifestyle to receive a healthy prediction.</p>", unsafe_allow_html=True)
-        
+        cfs_list = cfs_list.iloc[0]
         # Define a list of conditions and messages for counterfactuals
         counterfactuals_conditions = [
             (cfs_list[0] != BMI, "BMI", "Reduce your weight", BMI, cfs_list[0]),
@@ -342,9 +437,9 @@ if selected == "Dashboard":
 
     #End Prediction
 
-    if "prediction" not in st.session_state:
-        st.session_state.prediction = str(round(prediction_prob[0][1] * 100, 2))
-        st.session_state.prediction_bool = log_model.predict(df)
+    
+    st.session_state.prediction = str(round(prediction_prob[0][1] * 100, 2))
+    st.session_state.prediction_bool = log_model.predict(df)
 
 
 
@@ -383,8 +478,7 @@ if selected == "Dashboard":
         unsafe_allow_html=True,
     )
     # Using object notation
-    st.sidebar.image('pictures/stock_placeholder.jpg', width=100)
-    st.sidebar.markdown("<h1 style='text-align: center;' >Patient " + patient_num + "</h1>", unsafe_allow_html=True)
+    
     sidecont1, sidecont2 = st.sidebar.columns([3, 3])
 
     custom_css = """
@@ -415,8 +509,8 @@ if selected == "Dashboard":
             st.markdown("<h2 style='text-align: center;' >General Health </h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;' >" + genhealth +"<p>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.markdown("<h2 style='text-align: center;' >Asthma </h2>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center;' >" + asthma +"<p>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center;' >Alcohol </h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;' >" + alcohol +"<p>", unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown("<h2 style='text-align: center;' >Difficulty Walking </h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;' >" + diffwalk +"<p>", unsafe_allow_html=True)
@@ -671,4 +765,15 @@ if selected == "Dashboard":
     #Start of the AI
 if selected == "Dashboard With AI":
     load_dashboard_with_ai()
-        
+
+
+if selected == "About":
+    col1, col2, _ = st.columns([1, 2,1])
+    with col2.container(border=True):
+        st.subheader("Contact Information")
+        st.markdown("""Tim Vanherwegen""")
+        st.markdown("+32495197991")
+        st.markdown("tim.vanherwegen.tv@gmail.com")
+
+    with col1.container():
+        st.image("images/handholding.png")
