@@ -295,18 +295,8 @@ if selected == "Dashboard":
         return df
 
     def load_counterfactuals():
-        dataset = pd.read_parquet('heart_2020_cleaned.parquet')
-        target = dataset["HeartDisease"]
-        train_dataset, _, _, _ = train_test_split(dataset,
-                                                                        target,
-                                                                        test_size=0.2,
-                                                                        random_state=0,
-                                                                        stratify=target)
-        d = dice_ml.Data(dataframe=train_dataset, continuous_features=['PhysicalHealth', 'MentalHealth','SleepTime'], outcome_name='HeartDisease')
         feature_ranges = {'SleepTime': (4,10), 'BMICategory':('Obese (30.0 <= BMI < +Inf)', 'Normal weight (18.5 <= BMI < 25.0)', 'Overweight (25.0 <= BMI < 30.0)')}
-        model = load("pipeline.joblib")
-        m = dice_ml.Model(model=model, backend="sklearn")
-        exp = dice_ml.Dice(d, m, method="random") #use methid="random" for faster generation
+        exp = load("exp.joblib")
         e1 = exp.generate_counterfactuals(random_features, total_CFs=10, permitted_range=feature_ranges, desired_class="opposite", proximity_weight=1.5, diversity_weight=2.0, features_to_vary=["BMICategory", "Smoking", "SleepTime", "AlcoholDrinking", "DiffWalking","PhysicalActivity", "GenHealth"])
         cfe_json = json.loads(e1.to_json())        
         cfe_df = pd.DataFrame(cfe_json['cfs_list'][0],columns=cfe_json['feature_names_including_target'])
