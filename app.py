@@ -10,11 +10,6 @@ import random
 # import streamviz as sv
 import matplotlib.pyplot as plt
 from joblib import dump, load
-import dice_ml
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from streamlit_option_menu import option_menu
 from helperfunctions import *
@@ -347,8 +342,6 @@ if selected == "Dashboard":
     
     
     with col2.container():
-        st.subheader("Counterfactuals")
-        st.markdown("<p>Here you can see what changes you can make to your lifestyle to receive a healthy prediction.</p>", unsafe_allow_html=True)
         cfs_list = cfs_list.iloc[0]
         # Define a list of conditions and messages for counterfactuals
         counterfactuals_conditions = [
@@ -361,6 +354,10 @@ if selected == "Dashboard":
             (cfs_list[12] != genhealth, "General Health", "Improve your general health", genhealth, cfs_list[12]),
             # (cfs_list[13] != sleeptime, "Sleep Time", "Sleep more every night", str(sleeptime) + " hours", str(float(math.ceil(cfs_list[13]))) + " hours")
         ]
+        st.subheader("Counterfactuals")
+
+        st.markdown("<p>Here you can see what changes you can make to your lifestyle to receive a healthy prediction.</p>", unsafe_allow_html=True)
+        
         
         first_shown = False  # Track whether the first counterfactual has been shown
         
@@ -380,27 +377,51 @@ if selected == "Dashboard":
                         st.markdown(f"Action - {action}")
                         if current and target:
                             st.markdown(f"{current} => {target}")
+        st.markdown("<p> Press the predict button below to see what effect the recommend changes would have on your predicted risk.</p>", unsafe_allow_html=True)
+        colpred1, colpred2 = st.columns([1,1])
+        if colpred1.button("Predict", use_container_width =True):
+            heart = load_dataset()
+            cf_person = pd.DataFrame(cfs_list).T
+            cf_person.columns = cf_person.columns.astype(str)
+
+            input_df = cf_person
+            df = pd.concat([input_df, heart], axis=0)
+            df = df.drop(columns=["HeartDisease"])
+            cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "DiffWalking",
+                        "Sex", "AgeCategory", "Race", "Diabetic", "PhysicalActivity",
+                        "GenHealth", "Asthma", "KidneyDisease", "SkinCancer"]
+            for cat_col in cat_cols:
+                dummy_col = pd.get_dummies(df[cat_col], prefix=cat_col)
+                df = pd.concat([df, dummy_col], axis=1)
+                del df[cat_col]
+            df = df[:1]
+            df.fillna(0, inplace=True)
+            log_model = pickle.load(open(LOG_MODEL_PATH, "rb"))
+
+            prediction_prob = log_model.predict_proba(df)  
+            delta_calculated = round(round(prediction_prob[0][1] * 100, 2) - float(st.session_state.prediction),2)
+
+            colpred2.metric(label="Heart Disease Risk", value=str(round(prediction_prob[0][1] * 100, 2)) + " %", delta= str(delta_calculated) + " %", delta_color="inverse")
+            colpred2.session_state.previous_state = round(prediction_prob[0][1] * 100, 2)
 
 
 
 
 
 
-    st.subheader("What If?")
 
 
-    col2cont =  st.container(border=True)
-    #Prediction
+    # col2cont =  st.container(border=True)
+    # #Prediction
 
     heart = load_dataset()
 
 
-    col2topcont = col2cont.container()
-    col2topcont1, col2topcont2 = col2topcont.columns([1,1])
-    col2cont.markdown("<p>Here you can see how much your predicted heart risk would change if you would make some lifestyle changes. Press the Predict button after changing a variable.</p>", unsafe_allow_html=True)
-    submit = col2topcont1.button("Predict")
+    # col2topcont = col2cont.container()
+    # col2topcont1, col2topcont2 = col2topcont.columns([1,1])
+    # submit = col2topcont1.button("Predict")
 
-    input_df = user_input_features()
+    input_df = random_features
     df = pd.concat([input_df, heart], axis=0)
     df = df.drop(columns=["HeartDisease"])
     cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "DiffWalking",
@@ -420,10 +441,10 @@ if selected == "Dashboard":
         #Change this to predicted
         st.session_state.previous_state = round(prediction_prob[0][1] * 100, 2)
 
-    if submit:      
-        delta_calculated = round(round(prediction_prob[0][1] * 100, 2) - st.session_state.previous_state,2)
-        col2topcont2.metric(label="Heart Disease Risk", value=str(round(prediction_prob[0][1] * 100, 2)) + " %", delta= str(delta_calculated) + " %", delta_color="inverse")
-        st.session_state.previous_state = round(prediction_prob[0][1] * 100, 2)
+    # if submit:      
+    #     delta_calculated = round(round(prediction_prob[0][1] * 100, 2) - st.session_state.previous_state,2)
+    #     col2topcont2.metric(label="Heart Disease Risk", value=str(round(prediction_prob[0][1] * 100, 2)) + " %", delta= str(delta_calculated) + " %", delta_color="inverse")
+    #     st.session_state.previous_state = round(prediction_prob[0][1] * 100, 2)
 
     #End Prediction
 
