@@ -13,16 +13,17 @@ from joblib import dump, load
 from sklearn.base import BaseEstimator, TransformerMixin
 from streamlit_option_menu import option_menu
 from helperfunctions import *
-from dashboard_with_ai import load_dashboard_with_ai
 import math
 import lightgbm as lgb
+
+
 
 st.set_page_config(layout="wide")
 
 selected = option_menu(
     menu_title=None,
-    options=["Home", "Dashboard", "Dashboard With AI", "About"],
-    icons=["house", "book", "book", "envelope"],
+    options=["Home", "Dashboard", "About"],
+    icons=["house", "book", "envelope"],
     menu_icon="cast",
     orientation="horizontal",
     default_index=1,
@@ -297,8 +298,6 @@ if selected == "Dashboard":
         cfe_df = pd.DataFrame(cfe_json['cfs_list'][0],columns=cfe_json['feature_names_including_target'])
         return cfe_df
    
-
-        
 
     class Droper(BaseEstimator, TransformerMixin):
         '''
@@ -773,9 +772,9 @@ if selected == "Dashboard":
 
 
 
-    #Start of the AI
-if selected == "Dashboard With AI":
-    load_dashboard_with_ai()
+#     #Start of the AI
+# if selected == "Dashboard With AI":
+#     load_dashboard_with_ai()
 
 
 if selected == "About":

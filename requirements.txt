@@ -10,3 +10,5 @@ matplotlib
 dice-ml
 streamlit_option_menu
 lightgbm
+pydantic
+langchainhub

@@ -5,21 +5,74 @@ import numpy as np
 import pickle
 import json
 import sklearn
-import plotly.graph_objs as go
 import random
 # import streamviz as sv
-import matplotlib.pyplot as plt
 from joblib import dump, load
+import joblib
 import dice_ml
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.base import BaseEstimator, TransformerMixin
 from streamlit_option_menu import option_menu
 from helperfunctions import *
+from langchain.tools import BaseTool, StructuredTool, tool
+from sklearn.base import BaseEstimator, TransformerMixin
 
-def load_dashboard_with_ai():
+
+# from joblib import load
+import pandas as pd
+from langchain.pydantic_v1 import BaseModel, Field
+from langchain_openai import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain import hub
+from langchain.agents import AgentExecutor, create_openai_tools_agent
+from langchain.memory import ChatMessageHistory
+
+
+
+st.set_page_config(layout="wide")
+
+selected = option_menu(
+    menu_title=None,
+    options=["Home", "Dashboard", "About"],
+    icons=["house", "book", "envelope"],
+    menu_icon="cast",
+    orientation="horizontal",
+    default_index=1,
+    styles={
+        "container":{"max-width":"100%", "padding":"0"},
+        
+    }
+)
+st.markdown(
+        """
+            <style>
+                .appview-container .main .block-container {{
+                    padding-top: {padding_top}rem;
+                    padding-bottom: {padding_bottom}rem;
+                    }}
+
+            </style>""".format(
+            padding_top=3, padding_bottom=3
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+# from streamlit_float import *
+
+# float_init(theme=True, include_unstable_primary=False)
+
+if selected == "Home":
+    col1, col2, _ = st.columns([1, 2,1])
+    col2.title("Heart Health Advisor")
+    col2.subheader("Welcome to the Heart Health Advisor")
+    col2.markdown("""At HeartBeat, we're dedicated to empowering you on your journey to heart health.
+                   Our user-friendly app combines cutting-edge technology with personalized insights to help you understand and manage your heart disease risk. 
+                  From clear explanations to easily understandable advice, we hope to assist you in your journey towards a healthy future.""")
+    with col1.container():
+        st.image("images/handholding.png")
+
+if selected == "Dashboard":
+
+    
     DATASET_PATH = "heart_2020_cleaned.parquet"
     LOG_MODEL_PATH = "logistic_regression.pkl"
     #Gets random row from the dataset
@@ -47,15 +100,26 @@ def load_dashboard_with_ai():
     alcohol = chosen_person[3]
     strokecat = chosen_person[4]
     physicalhealth = chosen_person[5]
+    mentalhealth = chosen_person[6]
     diffwalk = chosen_person[7]
     gender = chosen_person[8]
     age = chosen_person[9]
+    race = chosen_person[10]
     diabeticcat = chosen_person[11]
     physicalactivity = chosen_person[12]
     genhealth = chosen_person[13]
     sleeptime = chosen_person[14]
     asthma = chosen_person[15]
+    kidneydisease = chosen_person[16]
+    skincancer = chosen_person[17]
 
+    @st.cache_data(persist=True)
+    def load_dataset() -> pd.DataFrame:
+        # Assuming you have converted your dataset to Parquet format
+        # and updated the DATASET_PATH to point to the .parquet file
+        parquet_file_path = DATASET_PATH  # Update this to your Parquet file path
+        heart_df = pd.read_parquet(parquet_file_path)
+        return heart_df
 
 
 
@@ -73,29 +137,99 @@ def load_dashboard_with_ai():
         },
         }
         
-    col1, col2 = st.columns([3,2])
+    col1, col2 = st.columns([2,3])
     colcol1, colcol2 = col1.columns([3,2])
     contcontcol1 = colcol1.container(border=True)
-    contcontcol1.subheader(f"Hello, Patient {patient_num}")
-    contcontcol1.markdown("""
-                    Welcome to your health dashboard. 
-                    Here you can find all the information about your health. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
-    
+    with col1.container(border=True):
+        st.subheader(f"Hello, Patient {patient_num}")
+        st.markdown("""
+                        Welcome to your health dashboard. 
+                        Here you can find all the information about your health. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
+
     contcol2 = colcol2.container(border=True)
+    random_features = pd.DataFrame({
+            "BMICategory": [BMI],
+            "Smoking": [smokingcat],
+            "AlcoholDrinking": [alcohol],
+            "Stroke": [strokecat],
+            "PhysicalHealth": [physicalhealth],
+            "MentalHealth": [0],
+            "DiffWalking": [diffwalk],
+            "Sex": [gender],
+            "AgeCategory": [age],
+            "Race": ["White"],
+            "Diabetic": [diabeticcat],
+            "PhysicalActivity": ["No"],
+            "GenHealth": [genhealth],
+            "SleepTime": [sleeptime],
+            "Asthma": [asthma],
+            "KidneyDisease": ["No"],
+            "SkinCancer": ["No"]
+        })
+
+    random_features_dict = {
+            "BMICategory": BMI,
+            "Smoking": smokingcat,
+            "AlcoholDrinking": alcohol,
+            "Stroke": strokecat,
+            "PhysicalHealth": physicalhealth,
+            "MentalHealth": 0,
+            "DiffWalking": diffwalk,
+            "Sex": gender,
+            "AgeCategory": age,
+            "Race": "White",
+            "Diabetic": diabeticcat,
+            "PhysicalActivity": "No",
+            "GenHealth": genhealth,
+            "SleepTime": sleeptime,
+            "Asthma": asthma,
+            "KidneyDisease": "No",
+            "SkinCancer": "No"
+        }
+
+
+    heart = load_dataset()
 
 
 
 
+    input_df = random_features
+    df = pd.concat([input_df, heart], axis=0)
+    df = df.drop(columns=["HeartDisease"])
+    cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "DiffWalking",
+                "Sex", "AgeCategory", "Race", "Diabetic", "PhysicalActivity",
+                "GenHealth", "Asthma", "KidneyDisease", "SkinCancer"]
+    for cat_col in cat_cols:
+        dummy_col = pd.get_dummies(df[cat_col], prefix=cat_col)
+        df = pd.concat([df, dummy_col], axis=1)
+        del df[cat_col]
+    df = df[:1]
+    df.fillna(0, inplace=True)
+    log_model = pickle.load(open(LOG_MODEL_PATH, "rb"))
+
+    prediction_prob = log_model.predict_proba(df)  
+
+    if "previous_state" not in st.session_state:
+        #Change this to predicted
+        st.session_state.previous_state = round(prediction_prob[0][1] * 100, 2)
 
 
 
-    contcol2.markdown("<p style='text-align: center;' > Your calculated risk is</p>", unsafe_allow_html=True)
-    if(st.session_state.prediction_bool == 0):
-        contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem; color:green;'>" + st.session_state.prediction + "%</h1>", unsafe_allow_html=True)
-        contcol2.markdown("<p style='text-align: center;' >Considered Healthy</p>", unsafe_allow_html=True)
-    else:
-        contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem; color:red;'>" + st.session_state.prediction + "%</h1>", unsafe_allow_html=True)
-        contcol2.markdown("<p style='text-align: center;' >Considered Unhealthy</p>", unsafe_allow_html=True)
+    #End Prediction
+
+
+    st.session_state.prediction = str(round(prediction_prob[0][1] * 100, 2))
+    st.session_state.prediction_bool = log_model.predict(df)
+
+
+
+    # contcol2.markdown("<p style='text-align: center;' > Your calculated risk is</p>", unsafe_allow_html=True)
+    # if(st.session_state.prediction_bool == 0):
+    #     contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem; color:green;'>" + st.session_state.prediction + "%</h1>", unsafe_allow_html=True)
+    #     contcol2.markdown("<p style='text-align: center;' >Considered Healthy</p>", unsafe_allow_html=True)
+    # else:
+    #     contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem; color:red;'>" + st.session_state.prediction + "%</h1>", unsafe_allow_html=True)
+    #     contcol2.markdown("<p style='text-align: center;' >Considered Unhealthy</p>", unsafe_allow_html=True)
 
 
     st.markdown(
@@ -405,10 +539,189 @@ def load_dashboard_with_ai():
             st.vega_lite_chart(pie_chart_spec, use_container_width=True)
 
 
+    # with col2.container(border=True):
+    #     st.subheader("Your Heart Health Assistant")
+    #     st.markdown("<p>Here you can ask any questions you have about your health. The AI will try to answer them to the best of its ability.</p>", unsafe_allow_html=True)
+    #     st.markdown("""<iframe src="https://vanherwegentim-chatbot-app-ci68bm.streamlit.app/?embed_options=disable_scrolling,show_padding,show_colored_line,show_toolbar,show_footer&embed=true" height="650" style="width: 100%; border: none;"></iframe>""", unsafe_allow_html=True)
+
+
+    #############################
+    # LangChain ChatGPT
+    #############################
+
+    def drop_not_wanted_features(df, features_to_drop, target_variable):
+        '''
+        Function to drop unwanted features
+        '''
+        for feature in features_to_drop:
+            if feature in list(df.columns):
+                df.drop(columns=feature, inplace=True)
+                
+        if target_variable in list(df.columns):
+            df.drop(columns=target_variable, inplace=True)
+        
+        return df
+    class Droper(BaseEstimator, TransformerMixin):
+        '''
+        Adding a clasws for custom pipeline step
+        '''
+        def __init__(self, features_to_drop, target_variable):
+                self.features_to_drop = features_to_drop
+                self.target_variable = target_variable
+                
+        def fit(self, X, y):
+                return self
+            
+        def transform(self, X):
+            x = X.copy()
+            return drop_not_wanted_features(x, self.features_to_drop, self.target_variable)
+
+
+    # class MLModel(BaseModel):
+    #     BMICategory: str = "Normal weight (18.5 <= BMI < 25.0)"  
+    #     Smoking: str = "Yes"
+    #     AlcoholDrinking: str = "No"
+    #     Stroke: str = "Yes"
+    #     PhysicalHealth: float = 12.0
+    #     MentalHealth: float = 10.0
+    #     DiffWalking: str = "Yes"
+    #     Sex: str = "Male"
+    #     AgeCategory: str = "50-54"
+    #     Race: str = "White"
+    #     Diabetic: str = "Yes"
+    #     PhysicalActivity: str = "No"
+    #     GenHealth: str = "Excellent"
+    #     SleepTime: float = 8.0
+    #     Asthma: str = "No"
+    #     KidneyDisease: str = "No"
+    #     SkinCancer: str = "No"
+    class MLModel(BaseModel):
+        BMICategory: str = "Normal weight (18.5 <= BMI < 25.0)"  
+        Smoking: str = "Yes"
+        AlcoholDrinking: str = "No"
+        Stroke: str = "Yes"
+        PhysicalHealth: float = 12.0
+        MentalHealth: float = 10.0
+        DiffWalking: str = "Yes"
+        Sex: str = "Male"
+        AgeCategory: str = "50-54"
+        Race: str = "White"
+        Diabetic: str = "Yes"
+        PhysicalActivity: str = "No"
+        GenHealth: str = "Excellent"
+        SleepTime: float = 8.0
+        Asthma: str = "No"
+        KidneyDisease: str = "No"
+        SkinCancer: str = "No"
+
+
+    @tool
+    def call_cfs_generator(random_features) -> pd.DataFrame:
+        """This returns counterfactuals, the reason why people have heart disease risk. Only use this when they request why they have a certain risk."""    
+        random_features = pd.DataFrame(random_features, index=[0])
+        
+        
+        feature_ranges = {'SleepTime': (4,10), 'BMICategory':('Obese (30.0 <= BMI < +Inf)', 'Normal weight (18.5 <= BMI < 25.0)', 'Overweight (25.0 <= BMI < 30.0)')}
+        exp = joblib.load("exp.joblib")
+        e1 = exp.generate_counterfactuals(random_features, total_CFs=1, permitted_range=feature_ranges, desired_class="opposite", proximity_weight=1.5, diversity_weight=2.0, features_to_vary=["BMICategory", "Smoking", "SleepTime", "AlcoholDrinking", "DiffWalking","PhysicalActivity", "GenHealth"])
+        cfe_json = json.loads(e1.to_json())        
+        cfe_df = pd.DataFrame(cfe_json['cfs_list'][0],columns=cfe_json['feature_names_including_target'])
+        
+        return cfe_df
+
+
+    @tool
+    def predict_model(new_value: MLModel) -> int:
+        """This calculates their heart disease risk, Only use this when they request their heart disease risk"""
+        model = pickle.load(open("logistic_regression.pkl", "rb"))
+        
+        # Convert MLModel instance to a dictionary, then to a DataFrame
+        new_value_dict = new_value.dict()
+        # new_value_df = pd.DataFrame([new_value_dict])  # Convert dict to DataFrame correctly
+        heart = load_dataset()
+        cf_person = pd.DataFrame(new_value_dict, index=[0])
+        cf_person.columns = cf_person.columns.astype(str)
+
+        input_df = cf_person
+        df = pd.concat([input_df, heart], axis=0)
+        df = df.drop(columns=["HeartDisease"])
+        cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "DiffWalking",
+                    "Sex", "AgeCategory", "Race", "Diabetic", "PhysicalActivity",
+                    "GenHealth", "Asthma", "KidneyDisease", "SkinCancer"]
+        for cat_col in cat_cols:
+            dummy_col = pd.get_dummies(df[cat_col], prefix=cat_col)
+            df = pd.concat([df, dummy_col], axis=1)
+            del df[cat_col]
+        df = df[:1]
+        df.fillna(0, inplace=True)
+        y_pred = model.predict_proba(df)[0][1]*100
+        return y_pred
+
+    model = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0, api_key=st.secrets["OPENAI_API_KEY"])
+    # random_features_dict = {
+    #         "BMICategory": "Obese (30.0 <= BMI < +Inf)",
+    #         "Smoking": "Yes",
+    #         "AlcoholDrinking": "No",
+    #         "Stroke": "No",
+    #         "PhysicalHealth": 12.0,
+    #         "MentalHealth": 10.0,
+    #         "DiffWalking": "Yes",
+    #         "Sex": "Male",
+    #         "AgeCategory": "50-54",
+    #         "Race": "White",
+    #         "Diabetic": "Yes",
+    #         "PhysicalActivity": "No",
+    #         "GenHealth": "Poor",
+    #         "SleepTime": 6.0,
+    #         "Asthma": "No",
+    #         "KidneyDisease": "No",
+    #         "SkinCancer": "No"
+    #     }
+    initial_data = json.dumps(random_features_dict)
+    initial_data
+
+    tools = [predict_model, call_cfs_generator]
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    memory.load_memory_variables({})
+    
+    prompt = hub.pull("hwchase17/openai-tools-agent")
+    agent = create_openai_tools_agent(model, tools, prompt)
+    agent_executor  = AgentExecutor(
+    agent=agent, tools=tools, verbose=True, memory=memory
+    )
+
+
+    # st.write(agent_executor.invoke(
+    # {
+    #     "input": f": What is my heart disease risk?: {initial_data}?"
+    # }
+    # ))
     with col2.container(border=True):
         st.subheader("Your Heart Health Assistant")
-        st.markdown("<p>Here you can ask any questions you have about your health. The AI will try to answer them to the best of its ability.</p>", unsafe_allow_html=True)
-        st.markdown("""<iframe src="https://vanherwegentim-chatbot-app-ci68bm.streamlit.app/?embed_options=disable_scrolling,show_padding,show_colored_line,show_toolbar,show_footer&embed=true" height="650" style="width: 100%; border: none;"></iframe>""", unsafe_allow_html=True)
+        if "openai_model" not in st.session_state:
+            st.session_state["openai_model"] = "gpt-3.5-turbo"
 
+        if "messages" not in st.session_state:
+            st.session_state.messages = [{"role": "assistant", "content": "Hello! How can I assist you today?"}]
 
-    
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+        if prompt := st.chat_input("What is my heart disease risk?"):
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            with st.chat_message("assistant"):
+                response = agent_executor.invoke({"input": prompt + f": {initial_data}?"})
+                # stream = client.chat.completions.create(
+                #     model=st.session_state["openai_model"],
+                #     messages=[
+                #         {"role": m["role"], "content": m["content"]}
+                #         for m in st.session_state.messages
+                #     ],
+                #     stream=True,
+                # )
+                st.write(response["output"])
+            st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+
