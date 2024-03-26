@@ -29,15 +29,15 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Heart Chatbot", page_icon=":anatomical_heart:")
 
 selected = option_menu(
     menu_title=None,
     options=["Home", "Dashboard", "About"],
-    icons=["house", "book", "envelope"],
+    icons=["house", "speedometer2", "envelope"],
     menu_icon="cast",
     orientation="horizontal",
-    default_index=1,
+    default_index=0,
     styles={
         "container":{"max-width":"100%", "padding":"0"},
         
@@ -190,26 +190,6 @@ if selected == "Dashboard":
             "SkinCancer": ["No"]
         })
 
-    random_features_dict = {
-            "BMICategory": BMI,
-            "Smoking": smokingcat,
-            "AlcoholDrinking": alcohol,
-            "Stroke": strokecat,
-            "PhysicalHealth": physicalhealth,
-            "MentalHealth": 0,
-            "DiffWalking": diffwalk,
-            "Sex": gender,
-            "AgeCategory": age,
-            "Race": "White",
-            "Diabetic": diabeticcat,
-            "PhysicalActivity": "No",
-            "GenHealth": genhealth,
-            "SleepTime": sleeptime,
-            "Asthma": asthma,
-            "KidneyDisease": "No",
-            "SkinCancer": "No"
-        }
-
 
     heart = load_dataset()
 
@@ -303,7 +283,7 @@ if selected == "Dashboard":
     with col1.container():
         option = st.selectbox(
             "What Graph would you like to see?",
-            ("BMI", "Smoking", "Sleep Time", "General Health", "Alcohol Drinking", "Stroke", "Difficulty Walking", "Diabetic"),
+            ("BMI", "Smoking", "General Health", "Alcohol Drinking", "Stroke", "Difficulty Walking", "Diabetic"),
             placeholder="Select a Graph to display",
         )
 
@@ -429,14 +409,6 @@ if selected == "Dashboard":
         # Adjusted for example completeness
         with col1.container(border=True):
             st.subheader("Diabetes")        
-            # if diabeticcat == "Yes":
-            #     st.markdown(f"<p style='color: red;'>You are part of the {percentage}% that has had a stroke.</p>", unsafe_allow_html=True)
-            # if diabeticcat == "No":
-            #     st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that hasn't had a stroke.</p>", unsafe_allow_html=True)
-            # if diabeticcat == "No, borderline diabetes":
-            #     st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that hasn't had a stroke.</p>", unsafe_allow_html=True)
-            # if diabeticcat == "Yes (during pregnancy)":
-            #     st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that hasn't had a stroke.</p>", unsafe_allow_html=True)
             st.vega_lite_chart(pie_chart_spec, use_container_width=True)
         
     if option == "Stroke":
@@ -522,12 +494,6 @@ if selected == "Dashboard":
             else:
                 st.markdown(f"<p style='color: green;'>You are part of the {100 - percentage}% that doesn't smoke</p>", unsafe_allow_html=True)
             st.vega_lite_chart(pie_chart_spec, use_container_width=True)
-
-
-    # with col2.container(border=True):
-    #     st.subheader("Your Heart Health Assistant")
-    #     st.markdown("""<iframe src="https://vanherwegentim-chatbot-app-ci68bm.streamlit.app/?embed_options=disable_scrolling,show_padding,show_colored_line,show_toolbar,show_footer&embed=true" height="650" style="width: 100%; border: none;"></iframe>""", unsafe_allow_html=True)
-
 
     #############################
     # LangChain ChatGPT
