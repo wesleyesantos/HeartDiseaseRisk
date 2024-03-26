@@ -13,3 +13,4 @@ lightgbm
 pydantic
 langchainhub
 langchain
+langchain_openai
