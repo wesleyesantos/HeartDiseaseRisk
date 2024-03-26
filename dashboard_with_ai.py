@@ -25,6 +25,8 @@ from langchain import hub
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain.memory import ChatMessageHistory
 
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
 
 
 st.set_page_config(layout="wide")
@@ -75,25 +77,49 @@ if selected == "Dashboard":
     
     DATASET_PATH = "heart_2020_cleaned.parquet"
     LOG_MODEL_PATH = "logistic_regression.pkl"
+    log_model = pickle.load(open(LOG_MODEL_PATH, "rb"))
+
+    
     #Gets random row from the dataset
     total_rows= 319796
-    if "random_row_index" not in st.session_state:
-        # If not, generate a new random row index and store it in the session state
-        st.session_state.random_row_index = random.randint(0, total_rows - 1)
+    st.sidebar.image('pictures/stock_placeholder.jpg', width=100)
+    st.sidebar.markdown("<h1 style='text-align: center;' >Patient </h1>", unsafe_allow_html=True)
+    
+
+
+
+    option = st.sidebar.selectbox(
+    'Patient',
+    ('44', '222460','128868'), index=2, label_visibility="collapsed")
+    if(option == '44'):
+        num = 2
+    if(option == '222460'):
+        num = 1
+    if(option == '128868'):
+        num = 0
+    st.session_state.num = num
+    
+    if 'previous_num' not in st.session_state:
+        st.session_state.previous_num = num
+    else:
+        if st.session_state.num != st.session_state.previous_num:
+            st.session_state.messages = [{"content": "Hello! How can I assist you today? I can answer all your questions about your heart disease risk. Als je mij aanspreekt in het Nederlands, kan ik je ook in het Nederlands antwoorden.", "role": "assistant"}]
+            st.session_state["memory"] = ConversationBufferMemory(memory_key="chat_history",return_messages=True)
+            memory = ConversationBufferMemory(memory_key="chat_history",return_messages=True)
+            memory.load_memory_variables({})
+            st.session_state.previous_num = st.session_state.num
 
 
     random_person_1 = ["128868","Obese (30.0 <= BMI < +Inf)","Yes","No","No",12.0,10.0,"Yes","Male","50-54","White","Yes","No","Poor",6.0,"No","No","No"]
-    random_person_3 = ["222460","Overweight (25.0 <= BMI < 30.0)","Yes","No","No",10.0,30.0,"Yes","Male","75-79","White","Yes","No","Fair",10.0,"No","No","No"]
-    random_person_5 = ["44","Overweight (25.0 <= BMI < 30.0)","Yes","Yes","Yes",10.0,30.0,"Yes","Female","80 or older","White","Yes","No","Fair",7.0,"No","No","No"]
+    random_person_3 = ["222460","Overweight (25.0 <= BMI < 30.0)","Yes","Yes","No",10.0,30.0,"Yes","Male","75-79","White","Yes","No","Poor",10.0,"No","No","No"]
+    random_person_5 = ["44","Overweight (25.0 <= BMI < 30.0)","No","Yes","No",10.0,30.0,"Yes","Female","65-69","White","Yes","No","Poor",4.0,"Yes","Yes","Yes"]
     random_person_list = [random_person_1, random_person_3, random_person_5]
 
 
-    if "chosen_person" not in st.session_state:
-        random_number = random.randint(0, 2)
+    random_number = num
 
-        chosen_person = random_person_list[random_number]
-        st.session_state.chosen_person = chosen_person
-    chosen_person = st.session_state.chosen_person
+    chosen_person = random_person_list[random_number]
+    st.session_state.chosen_person = chosen_person
     patient_num = chosen_person[0]
     BMI = chosen_person[1]
     smokingcat = chosen_person[2]
@@ -138,15 +164,12 @@ if selected == "Dashboard":
         }
         
     col1, col2 = st.columns([2,3])
-    colcol1, colcol2 = col1.columns([3,2])
-    contcontcol1 = colcol1.container(border=True)
     with col1.container(border=True):
         st.subheader(f"Hello, Patient {patient_num}")
         st.markdown("""
                         Welcome to your health dashboard. 
                         Here you can find all the information about your health. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
 
-    contcol2 = colcol2.container(border=True)
     random_features = pd.DataFrame({
             "BMICategory": [BMI],
             "Smoking": [smokingcat],
@@ -192,46 +215,6 @@ if selected == "Dashboard":
 
 
 
-
-    input_df = random_features
-    df = pd.concat([input_df, heart], axis=0)
-    df = df.drop(columns=["HeartDisease"])
-    cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "DiffWalking",
-                "Sex", "AgeCategory", "Race", "Diabetic", "PhysicalActivity",
-                "GenHealth", "Asthma", "KidneyDisease", "SkinCancer"]
-    for cat_col in cat_cols:
-        dummy_col = pd.get_dummies(df[cat_col], prefix=cat_col)
-        df = pd.concat([df, dummy_col], axis=1)
-        del df[cat_col]
-    df = df[:1]
-    df.fillna(0, inplace=True)
-    log_model = pickle.load(open(LOG_MODEL_PATH, "rb"))
-
-    prediction_prob = log_model.predict_proba(df)  
-
-    if "previous_state" not in st.session_state:
-        #Change this to predicted
-        st.session_state.previous_state = round(prediction_prob[0][1] * 100, 2)
-
-
-
-    #End Prediction
-
-
-    st.session_state.prediction = str(round(prediction_prob[0][1] * 100, 2))
-    st.session_state.prediction_bool = log_model.predict(df)
-
-
-
-    # contcol2.markdown("<p style='text-align: center;' > Your calculated risk is</p>", unsafe_allow_html=True)
-    # if(st.session_state.prediction_bool == 0):
-    #     contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem; color:green;'>" + st.session_state.prediction + "%</h1>", unsafe_allow_html=True)
-    #     contcol2.markdown("<p style='text-align: center;' >Considered Healthy</p>", unsafe_allow_html=True)
-    # else:
-    #     contcol2.markdown("<h1 style='text-align:center;font-size:3rem; padding:0rem; color:red;'>" + st.session_state.prediction + "%</h1>", unsafe_allow_html=True)
-    #     contcol2.markdown("<p style='text-align: center;' >Considered Unhealthy</p>", unsafe_allow_html=True)
-
-
     st.markdown(
         """
         <style>
@@ -256,10 +239,6 @@ if selected == "Dashboard":
         """,
         unsafe_allow_html=True,
     )
-    # Using object notation
-    st.sidebar.image('pictures/stock_placeholder.jpg', width=100)
-    st.sidebar.markdown("<h1 style='text-align: center;' >Patient " + patient_num + "</h1>", unsafe_allow_html=True)
-    sidecont1, sidecont2 = st.sidebar.columns([3, 3])
 
     custom_css = """
     <style>
@@ -288,6 +267,12 @@ if selected == "Dashboard":
         with st.container(border=True):
             st.markdown("<h2 style='text-align: center;' >General Health </h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;' >" + genhealth +"<p>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("<h2 style='text-align: center;' >Physical Activity </h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;' >" + physicalactivity +"<p>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("<h2 style='text-align: center;' >Alcoholism </h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;' >" + alcohol +"<p>", unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown("<h2 style='text-align: center;' >Asthma </h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;' >" + asthma +"<p>", unsafe_allow_html=True)
@@ -541,14 +526,63 @@ if selected == "Dashboard":
 
     # with col2.container(border=True):
     #     st.subheader("Your Heart Health Assistant")
-    #     st.markdown("<p>Here you can ask any questions you have about your health. The AI will try to answer them to the best of its ability.</p>", unsafe_allow_html=True)
     #     st.markdown("""<iframe src="https://vanherwegentim-chatbot-app-ci68bm.streamlit.app/?embed_options=disable_scrolling,show_padding,show_colored_line,show_toolbar,show_footer&embed=true" height="650" style="width: 100%; border: none;"></iframe>""", unsafe_allow_html=True)
 
 
     #############################
     # LangChain ChatGPT
     #############################
+    def parse_counterfactuals(inference_data, cfe_raw):
+        """
+        Apply additonal boundary conditions
+        # BMICategory should not go higher
+        # Sleeptime should be higher or equal
+        # if 0, it should stay as 0 for smoking and alcohol
+        # if 1, it should stay as 1 for physical activity
+        """
+        bmicats = ["Underweight (BMI < 18.5)", "Normal weight (18.5 <= BMI < 25.0)", 
+               "Overweight (25.0 <= BMI < 30.0)", "Obese (30.0 <= BMI < +Inf)"]
+        # Assuming inference_data is a DataFrame and we're interested in the first row
+        initial_bmi_category = inference_data["BMICategory"].iloc[0]
+        initial_sleep_time = float(inference_data["SleepTime"].iloc[0])
+        initial_smoking = inference_data["Smoking"].iloc[0]
+        initial_alcohol = inference_data["AlcoholDrinking"].iloc[0]
+        
+        index_value1 = bmicats.index(initial_bmi_category)
+        
+        # To be dropped indices
+        to_drop = []
+        for ind, row in cfe_raw.iterrows():
 
+            current_index = bmicats.index(row["BMICategory"])
+            if initial_smoking == "No":
+                row["Smoking"] = "No"
+                
+            if initial_alcohol == "No":
+                row["AlcoholDrinking"] = "No"
+            # If current BMI category is higher than the initial, mark for dropping
+            if current_index > index_value1:
+                to_drop.append(ind)
+                continue  # Move to the next row
+            
+            # If SleepTime is not greater or equal to the initial, mark for dropping
+            if float(row["SleepTime"]) < initial_sleep_time:
+                to_drop.append(ind)
+                continue
+            
+            
+        
+        # Drop the rows outside the loop
+        cfe_raw.drop(labels=to_drop, axis=0, inplace=True)
+        cfe_raw.drop_duplicates(subset=None, inplace=True)
+        return cfe_raw
+
+
+
+
+
+
+        #Creating counterfactuals
     def drop_not_wanted_features(df, features_to_drop, target_variable):
         '''
         Function to drop unwanted features
@@ -561,9 +595,19 @@ if selected == "Dashboard":
             df.drop(columns=target_variable, inplace=True)
         
         return df
+
+    def load_counterfactuals():
+        feature_ranges = {'SleepTime': (4,10), 'BMICategory':('Obese (30.0 <= BMI < +Inf)', 'Normal weight (18.5 <= BMI < 25.0)', 'Overweight (25.0 <= BMI < 30.0)')}
+        exp = load("exp.joblib")
+        e1 = exp.generate_counterfactuals(random_features, total_CFs=10, permitted_range=feature_ranges, desired_class="opposite", proximity_weight=1.5, diversity_weight=2.0, features_to_vary=["BMICategory", "Smoking", "SleepTime", "AlcoholDrinking", "DiffWalking","PhysicalActivity", "GenHealth"])
+        cfe_json = json.loads(e1.to_json())        
+        cfe_df = pd.DataFrame(cfe_json['cfs_list'][0],columns=cfe_json['feature_names_including_target'])
+        return cfe_df
+   
+
     class Droper(BaseEstimator, TransformerMixin):
         '''
-        Adding a clasws for custom pipeline step
+        Adding a class for custom pipeline step
         '''
         def __init__(self, features_to_drop, target_variable):
                 self.features_to_drop = features_to_drop
@@ -575,71 +619,35 @@ if selected == "Dashboard":
         def transform(self, X):
             x = X.copy()
             return drop_not_wanted_features(x, self.features_to_drop, self.target_variable)
-
-
-    # class MLModel(BaseModel):
-    #     BMICategory: str = "Normal weight (18.5 <= BMI < 25.0)"  
-    #     Smoking: str = "Yes"
-    #     AlcoholDrinking: str = "No"
-    #     Stroke: str = "Yes"
-    #     PhysicalHealth: float = 12.0
-    #     MentalHealth: float = 10.0
-    #     DiffWalking: str = "Yes"
-    #     Sex: str = "Male"
-    #     AgeCategory: str = "50-54"
-    #     Race: str = "White"
-    #     Diabetic: str = "Yes"
-    #     PhysicalActivity: str = "No"
-    #     GenHealth: str = "Excellent"
-    #     SleepTime: float = 8.0
-    #     Asthma: str = "No"
-    #     KidneyDisease: str = "No"
-    #     SkinCancer: str = "No"
-    class MLModel(BaseModel):
-        BMICategory: str = "Normal weight (18.5 <= BMI < 25.0)"  
-        Smoking: str = "Yes"
-        AlcoholDrinking: str = "No"
-        Stroke: str = "Yes"
-        PhysicalHealth: float = 12.0
-        MentalHealth: float = 10.0
-        DiffWalking: str = "Yes"
-        Sex: str = "Male"
-        AgeCategory: str = "50-54"
-        Race: str = "White"
-        Diabetic: str = "Yes"
-        PhysicalActivity: str = "No"
-        GenHealth: str = "Excellent"
-        SleepTime: float = 8.0
-        Asthma: str = "No"
-        KidneyDisease: str = "No"
-        SkinCancer: str = "No"
-
-
-    @tool
-    def call_cfs_generator(random_features) -> pd.DataFrame:
-        """This returns counterfactuals, the reason why people have heart disease risk. Only use this when they request why they have a certain risk."""    
-        random_features = pd.DataFrame(random_features, index=[0])
+    
+    @st.cache_data(persist=True)
+    def pregenerate_counterfactual(random_features__):      
+        max_retries = 50 # Maximum number of attempts
+        retries = 0
         
-        
-        feature_ranges = {'SleepTime': (4,10), 'BMICategory':('Obese (30.0 <= BMI < +Inf)', 'Normal weight (18.5 <= BMI < 25.0)', 'Overweight (25.0 <= BMI < 30.0)')}
-        exp = joblib.load("exp.joblib")
-        e1 = exp.generate_counterfactuals(random_features, total_CFs=1, permitted_range=feature_ranges, desired_class="opposite", proximity_weight=1.5, diversity_weight=2.0, features_to_vary=["BMICategory", "Smoking", "SleepTime", "AlcoholDrinking", "DiffWalking","PhysicalActivity", "GenHealth"])
-        cfe_json = json.loads(e1.to_json())        
-        cfe_df = pd.DataFrame(cfe_json['cfs_list'][0],columns=cfe_json['feature_names_including_target'])
-        
-        return cfe_df
+        while retries < max_retries:
+            # Attempt to load and parse counterfactuals
+            cfs_list = load_counterfactuals()
+            cfs_list = parse_counterfactuals(random_features, cfs_list)
+            # Check if counterfactuals list is not empty
+            if not cfs_list.empty:  # Assuming cfs_list is a DataFrame; adjust condition if it's a list
+                cfs_list = cfs_list.iloc[0]
+                cfs_list[13] = float(round(cfs_list[13]))
+                counterfactuals_conditions = []
+                feat = pd.DataFrame(random_features).T
+                for i in range(14):
+                    if cfs_list.iloc[i] != feat.iloc[i].iloc[0]:
+                        counterfactuals_conditions.append({cfs_list.index[i]:(cfs_list[i])})
+                return counterfactuals_conditions, cfs_list
+            else:
+                retries += 1
 
-
-    @tool
-    def predict_model(new_value: MLModel) -> int:
-        """This calculates their heart disease risk, Only use this when they request their heart disease risk"""
-        model = pickle.load(open("logistic_regression.pkl", "rb"))
         
-        # Convert MLModel instance to a dictionary, then to a DataFrame
-        new_value_dict = new_value.dict()
-        # new_value_df = pd.DataFrame([new_value_dict])  # Convert dict to DataFrame correctly
-        heart = load_dataset()
-        cf_person = pd.DataFrame(new_value_dict, index=[0])
+        return None  # or return an empty DataFrame/list as per your design
+    
+    @st.cache_data(persist=True)
+    def generate_probability_prediction(cfs):
+        cf_person = pd.DataFrame(cfs)
         cf_person.columns = cf_person.columns.astype(str)
 
         input_df = cf_person
@@ -654,74 +662,105 @@ if selected == "Dashboard":
             del df[cat_col]
         df = df[:1]
         df.fillna(0, inplace=True)
-        y_pred = model.predict_proba(df)[0][1]*100
-        return y_pred
-
-    model = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0, api_key=st.secrets["OPENAI_API_KEY"])
-    # random_features_dict = {
-    #         "BMICategory": "Obese (30.0 <= BMI < +Inf)",
-    #         "Smoking": "Yes",
-    #         "AlcoholDrinking": "No",
-    #         "Stroke": "No",
-    #         "PhysicalHealth": 12.0,
-    #         "MentalHealth": 10.0,
-    #         "DiffWalking": "Yes",
-    #         "Sex": "Male",
-    #         "AgeCategory": "50-54",
-    #         "Race": "White",
-    #         "Diabetic": "Yes",
-    #         "PhysicalActivity": "No",
-    #         "GenHealth": "Poor",
-    #         "SleepTime": 6.0,
-    #         "Asthma": "No",
-    #         "KidneyDisease": "No",
-    #         "SkinCancer": "No"
-    #     }
-    initial_data = json.dumps(random_features_dict)
-    initial_data
-
-    tools = [predict_model, call_cfs_generator]
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    memory.load_memory_variables({})
+        prediction_prob = log_model.predict_proba(df)  
+        return round(prediction_prob[0][1] * 100, 2)
     
+    
+    predicition_prob = generate_probability_prediction(random_features)
+    counterfactual, cfs_list = pregenerate_counterfactual(random_features)
+    prediction_prob_of_counterfactual = generate_probability_prediction(pd.DataFrame(cfs_list).T)
+
+    
+
+    
+    @tool
+    def generate_counterfactual():
+        """This generates a heart disease counterfactual. The response is shown verbose.""" 
+        newline = "\n"
+        return f"""To potentially lower your heart disease risk, here are some changes that could be made based on a counterfactual scenario:
+            {newline.join(f"{cf}" for cf in counterfactual)}
+            These changes are hypothetical scenarios that suggest how certain lifestyle modifications could potentially reduce your heart disease risk. It's important to consult with healthcare professionals before making any significant changes to your lifestyle or health regimen.
+
+            Would you like to see the predicted heart disease risk if these changes were implemented?"""
+
+
+    @tool
+    def prediction_of_heart_disease_risk_of_counterfactual():
+        """Predicts the heart disease risk of a counterfactual. The response is shown verbose."""
+        return prediction_prob_of_counterfactual
+                
+
+
+    @tool
+    def predict_model() -> int:
+        """Predicts the heart disease risk of a patient. The response is shown verbose."""
+        return f"""Your heart disease risk is estimated to be {predicition_prob}%. Are you interested in learning more about how to manage your heart disease risk? Discover what actions you can take and see how your risk projection might change following certain lifestyle adjustments."""
+        
+    
+
+    model = ChatOpenAI(model="gpt-4", temperature=0, api_key=st.secrets["OPENAI_API_KEY"])
+    tools = [predict_model, generate_counterfactual, prediction_of_heart_disease_risk_of_counterfactual]
+    ## add session state to fix memory issue
+    if "memory" not in st.session_state:
+        st.session_state["memory"] = ConversationBufferMemory(memory_key="chat_history",return_messages=True,)
+        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+        memory.load_memory_variables({})
+    else:
+        memory = st.session_state["memory"]
+
+    # prompt = ChatPromptTemplate.from_messages(
+    #     [
+    #         ("system", "You are a helpful heart disease assistant"),
+    #         MessagesPlaceholder("chat_history", optional=True),
+    #         ("human", "{input}"),
+    #         MessagesPlaceholder("agent_scratchpad"),
+            
+    #     ]
+    # )
     prompt = hub.pull("hwchase17/openai-tools-agent")
     agent = create_openai_tools_agent(model, tools, prompt)
     agent_executor  = AgentExecutor(
-    agent=agent, tools=tools, verbose=True, memory=memory
+    agent=agent, tools=tools, verbose=True
+
     )
 
-
-    # st.write(agent_executor.invoke(
-    # {
-    #     "input": f": What is my heart disease risk?: {initial_data}?"
-    # }
-    # ))
-    with col2.container(border=True):
+    with col2.container(border=True, height=650):
         st.subheader("Your Heart Health Assistant")
-        if "openai_model" not in st.session_state:
-            st.session_state["openai_model"] = "gpt-3.5-turbo"
-
+        st.markdown("<p>Here you can ask any questions you have about your health disease risk. The AI will try to answer them to the best of its ability.</p>", unsafe_allow_html=True)
         if "messages" not in st.session_state:
-            st.session_state.messages = [{"role": "assistant", "content": "Hello! How can I assist you today?"}]
+            st.session_state.messages = [{"role": "assistant", "content": "Hello! How can I assist you today? I can answer all your questions about your heart disease risk. Als je mij aanspreekt in het Nederlands, kan ik je ook in het Nederlands antwoorden."}]
 
+        # Temporarily store the new message from chat input to add it after rendering the previous messages
+        new_message_content = st.session_state.get("new_message_content", None)
+
+        # Render existing messages
         for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
+            with st.chat_message(message["role"]):  
                 st.markdown(message["content"])
 
-        if prompt := st.chat_input("What is my heart disease risk?"):
-            st.session_state.messages.append({"role": "user", "content": prompt})
+        # Check if there's a new message to add
+        if new_message_content:
+            st.session_state.messages.append({"role": "user", "content": new_message_content})
             with st.chat_message("user"):
-                st.markdown(prompt)
+                st.markdown(new_message_content)
             with st.chat_message("assistant"):
-                response = agent_executor.invoke({"input": prompt + f": {initial_data}?"})
-                # stream = client.chat.completions.create(
-                #     model=st.session_state["openai_model"],
-                #     messages=[
-                #         {"role": m["role"], "content": m["content"]}
-                #         for m in st.session_state.messages
-                #     ],
-                #     stream=True,
-                # )
-                st.write(response["output"])
+                with st.spinner("Processing..."):
+                    response = agent_executor.invoke({"input": new_message_content})
+                    st.write(response["output"])
+                    
+                    # st.write_stream(get_response(new_message_content, ChatPromptTemplate.from_list(st.session_state.messages)))
+
+            # Add the assistant's response to the chat history
             st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+            # Clear the temporary store to reset for the next input
+            st.session_state.new_message_content = None
+
+        # Place the chat input at the bottom. Upon submission, store the content temporarily and trigger a rerender
+        new_message_content = st.chat_input("What is my heart disease risk?", key="new_chat_input")
+        if new_message_content:
+            st.session_state.new_message_content = new_message_content
+            st.rerun()
+      
+
+
 
