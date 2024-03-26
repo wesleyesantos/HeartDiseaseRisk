@@ -12,3 +12,4 @@ streamlit_option_menu
 lightgbm
 pydantic
 langchainhub
+langchain
