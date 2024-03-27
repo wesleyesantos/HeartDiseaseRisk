@@ -14,3 +14,4 @@ pydantic
 langchainhub
 langchain
 langchain_openai
+streamlit-analytics2

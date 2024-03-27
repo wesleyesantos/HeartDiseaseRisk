@@ -26,7 +26,7 @@ from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain.memory import ChatMessageHistory
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-import streamlit_analytics
+import streamlit_analytics2 as streamlit_analytics
 
 
 
