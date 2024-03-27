@@ -713,7 +713,8 @@ if selected == "Dashboard":
                 st.markdown(prompt)
             with history.chat_message("assistant"):
                 with st.spinner("Thinking..."):
-                    response = agent_executor.invoke({"input": prompt} )
+                    response = agent_executor.invoke({"input": prompt,
+                                                      "chat_history": st.session_state.messages} )
                     st.write(response["output"])
             st.session_state.messages.append({"role": "assistant", "content": response["output"]})
     
