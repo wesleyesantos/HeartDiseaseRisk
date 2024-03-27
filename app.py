@@ -26,10 +26,12 @@ from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain.memory import ChatMessageHistory
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+import streamlit_analytics
 
 
 
 st.set_page_config(layout="wide", page_title="Heart Chatbot", page_icon=":anatomical_heart:")
+streamlit_analytics.start_tracking()
 
 selected = option_menu(
     menu_title=None,
@@ -697,7 +699,7 @@ if selected == "Dashboard":
         st.markdown(f"<!-- {marker_text} -->", unsafe_allow_html=True)
 
         st.subheader("Your Heart Health Assistant")
-        st.markdown("<p>Here you can ask any questions you have about your health disease risk. The AI will try to answer them to the best of its ability. For example, ask it what your risk of heart disease is.</p>", unsafe_allow_html=True)
+        st.markdown("<p>Feel free to pose any questions regarding your risk of heart diseases. The AI will try to provide answers to the best of its capabilities. As a starting point, you might ask about your heart disease risk.</p>", unsafe_allow_html=True)
         history = st.container(height=400, border = False)
         yeet = st.chat_input("What is my heart disease risk?")
         if "messages" not in st.session_state:
@@ -739,3 +741,5 @@ if selected == "About":
 
     with col1.container():
         st.image("images/handholding.png")
+
+streamlit_analytics.stop_tracking()
