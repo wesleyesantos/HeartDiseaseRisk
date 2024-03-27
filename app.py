@@ -63,7 +63,7 @@ st.markdown(
 # float_init(theme=True, include_unstable_primary=False)
 
 if selected == "Home":
-    col1, col2, _ = st.columns([1, 2,1])
+    col1, col2 = st.columns([1, 2])
     col2.title("Heart Health Advisor")
     col2.subheader("Welcome to the Heart Risk Assessment Tool")
     col2.markdown("""This tool aims to assist you in comprehending your risk of heart disease. Currently, rather than utilizing your personal information to evaluate heart disease risk, the tool employs data from a preset patient profile. This approach is adopted because handling confidential information necessitates extensive approvals from regulatory bodies. To interact with the Chatbot, please navigate to the dashboard. While you can inquire about various topics, for optimal results, we recommend focusing your questions on heart disease risk.
@@ -90,7 +90,7 @@ if selected == "Dashboard":
 
     option = st.sidebar.selectbox(
     'Patient',
-    ('44', '222460','128868'), index=2, label_visibility="collapsed")
+    ('44', '222460','128868'), index=1, label_visibility="collapsed")
     if(option == '44'):
         num = 2
     if(option == '222460'):
@@ -393,7 +393,7 @@ if selected == "Dashboard":
 
 
 
-    if option == "Diabetes":
+    if option == "Diabetic":
         category_counts_dicts = [
         {"Category": "No", "Count": 269653},
         {"Category": "Yes", "Count": 40802},
@@ -690,45 +690,40 @@ if selected == "Dashboard":
 
     )
     
+    
+    marker_text = "unique_marker_for_height_adjustment"
 
+    with col2.container(border=True):
+        st.markdown(f"<!-- {marker_text} -->", unsafe_allow_html=True)
 
-    with col2.container(border=True, height=650):
         st.subheader("Your Heart Health Assistant")
         st.markdown("<p>Here you can ask any questions you have about your health disease risk. The AI will try to answer them to the best of its ability. For example, ask it what your risk of heart disease is.</p>", unsafe_allow_html=True)
+        history = st.container(height=400, border = False)
+        yeet = st.chat_input("What is my heart disease risk?")
         if "messages" not in st.session_state:
             st.session_state.messages = [{"role": "assistant", "content": "Hello! How can I assist you today? I can answer all your questions about your heart disease risk. Als je mij aanspreekt in het Nederlands, kan ik je ook in het Nederlands antwoorden."}]
 
-        # Temporarily store the new message from chat input to add it after rendering the previous messages
-        new_message_content = st.session_state.get("new_message_content", None)
-
-        # Render existing messages
         for message in st.session_state.messages:
-            with st.chat_message(message["role"]):  
+            with history.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-        # Check if there's a new message to add
-        if new_message_content:
-            st.session_state.messages.append({"role": "user", "content": new_message_content})
-            with st.chat_message("user"):
-                st.markdown(new_message_content)
-            with st.chat_message("assistant"):
-                with st.spinner("Processing..."):
-                    response = agent_executor.invoke({"input": new_message_content,
-                                                      "chat_history": st.session_state.messages,})
-                    st.write(response["output"])
-                    # st.write_stream(get_response(new_message_content, ChatPromptTemplate.from_list(st.session_state.messages)))
-
-            # Add the assistant's response to the chat history
+        if prompt := yeet:
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with history.chat_message("user"):
+                st.markdown(prompt)
+            with history.chat_message("assistant"):
+                response = agent_executor.invoke({"input": prompt} )
+                st.write(response["output"])
             st.session_state.messages.append({"role": "assistant", "content": response["output"]})
-            # Clear the temporary store to reset for the next input
-            st.session_state.new_message_content = None
-
-        # Place the chat input at the bottom. Upon submission, store the content temporarily and trigger a rerender
-        new_message_content = st.chat_input("What is my heart disease risk?", key="new_chat_input")
-        if new_message_content:
-            st.session_state.new_message_content = new_message_content
-            st.rerun()
-      
+    
+    st.markdown(f"""
+    <style>
+        /* Target the marker's parent container */
+        .element-container:has(> :contains('{marker_text}')) {{
+            height: 75vh !important;
+        }}
+    </style>
+""", unsafe_allow_html=True)
 
 
 
