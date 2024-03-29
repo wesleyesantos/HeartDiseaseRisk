@@ -68,9 +68,8 @@ if selected == "Home":
     col1, col2 = st.columns([1, 2])
     col2.title("Heart Health Advisor")
     col2.subheader("Welcome to the Heart Risk Assessment Tool")
-    col2.markdown("""This tool aims to assist you in comprehending your risk of heart disease. Currently, rather than utilizing your personal information to evaluate heart disease risk, the tool employs data from a preset patient profile. This approach is adopted because handling confidential information necessitates extensive approvals from regulatory bodies. To interact with the Chatbot, please navigate to the dashboard. While you can inquire about various topics, for optimal results, we recommend focusing your questions on heart disease risk.
-
-""")
+    col2.markdown("""This tool aims to assist you in comprehending your risk of heart disease. Currently, rather than utilizing your personal information to evaluate heart disease risk, the tool employs data from a preset patient profile. This approach is adopted because handling confidential information necessitates extensive approvals from regulatory bodies. To interact with the Chatbot, please navigate to the dashboard. While you can inquire about various topics, for optimal results, we recommend focusing your questions on heart disease risk. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population
+    """)
     with col1.container():
         st.image("images/handholding.png")
 
@@ -81,13 +80,19 @@ if selected == "Dashboard":
     LOG_MODEL_PATH = "logistic_regression.pkl"
     log_model = pickle.load(open(LOG_MODEL_PATH, "rb"))
 
-    
     #Gets random row from the dataset
     total_rows= 319796
     st.sidebar.image('pictures/stock_placeholder.jpg', width=100)
     st.sidebar.markdown("<h1 style='text-align: center;' >Patient </h1>", unsafe_allow_html=True)
-    
 
+    @st.cache_data(persist=True)
+    def load_dataset() -> pd.DataFrame:
+        # Assuming you have converted your dataset to Parquet format
+        # and updated the DATASET_PATH to point to the .parquet file
+        parquet_file_path = DATASET_PATH  # Update this to your Parquet file path
+        heart_df = pd.read_parquet(parquet_file_path)
+        return heart_df
+    heart = load_dataset()
 
 
     option = st.sidebar.selectbox(
@@ -111,7 +116,7 @@ if selected == "Dashboard":
             memory.load_memory_variables({})
             st.session_state.previous_num = st.session_state.num
 
-
+    
     random_person_1 = ["128868","Obese (30.0 <= BMI < +Inf)","Yes","No","No",12.0,10.0,"Yes","Male","50-54","White","Yes","No","Poor",6.0,"No","No","No"]
     random_person_3 = ["222460","Overweight (25.0 <= BMI < 30.0)","Yes","Yes","No",10.0,30.0,"Yes","Male","75-79","White","Yes","No","Poor",10.0,"No","No","No"]
     random_person_5 = ["44","Overweight (25.0 <= BMI < 30.0)","No","Yes","No",10.0,30.0,"Yes","Female","65-69","White","Yes","No","Poor",4.0,"Yes","Yes","Yes"]
@@ -140,14 +145,175 @@ if selected == "Dashboard":
     asthma = chosen_person[15]
     kidneydisease = chosen_person[16]
     skincancer = chosen_person[17]
+    random_features = pd.DataFrame({
+        "BMICategory": [BMI],
+        "Smoking": [smokingcat],
+        "AlcoholDrinking": [alcohol],
+        "Stroke": [strokecat],
+        "PhysicalHealth": [physicalhealth],
+        "MentalHealth": [0],
+        "DiffWalking": [diffwalk],
+        "Sex": [gender],
+        "AgeCategory": [age],
+        "Race": ["White"],
+        "Diabetic": [diabeticcat],
+        "PhysicalActivity": ["No"],
+        "GenHealth": [genhealth],
+        "SleepTime": [sleeptime],
+        "Asthma": [asthma],
+        "KidneyDisease": ["No"],
+        "SkinCancer": ["No"]
+    })
 
+    def parse_counterfactuals(inference_data, cfe_raw):
+        """
+        Apply additonal boundary conditions
+        # BMICategory should not go higher
+        # Sleeptime should be higher or equal
+        # if 0, it should stay as 0 for smoking and alcohol
+        # if 1, it should stay as 1 for physical activity
+        """
+        bmicats = ["Underweight (BMI < 18.5)", "Normal weight (18.5 <= BMI < 25.0)", 
+               "Overweight (25.0 <= BMI < 30.0)", "Obese (30.0 <= BMI < +Inf)"]
+        # Assuming inference_data is a DataFrame and we're interested in the first row
+        initial_bmi_category = inference_data["BMICategory"].iloc[0]
+        initial_sleep_time = float(inference_data["SleepTime"].iloc[0])
+        initial_smoking = inference_data["Smoking"].iloc[0]
+        initial_alcohol = inference_data["AlcoholDrinking"].iloc[0]
+        
+        index_value1 = bmicats.index(initial_bmi_category)
+        
+        # To be dropped indices
+        to_drop = []
+        for ind, row in cfe_raw.iterrows():
+
+            current_index = bmicats.index(row["BMICategory"])
+            if initial_smoking == "No":
+                row["Smoking"] = "No"
+                
+            if initial_alcohol == "No":
+                row["AlcoholDrinking"] = "No"
+            # If current BMI category is higher than the initial, mark for dropping
+            if current_index > index_value1:
+                to_drop.append(ind)
+                continue  # Move to the next row
+            
+            # If SleepTime is not greater or equal to the initial, mark for dropping
+            if float(row["SleepTime"]) < initial_sleep_time:
+                to_drop.append(ind)
+                continue
+            
+            
+        
+        # Drop the rows outside the loop
+        cfe_raw.drop(labels=to_drop, axis=0, inplace=True)
+        cfe_raw.drop_duplicates(subset=None, inplace=True)
+        return cfe_raw
+
+
+
+
+
+
+        #Creating counterfactuals
+    def drop_not_wanted_features(df, features_to_drop, target_variable):
+        '''
+        Function to drop unwanted features
+        '''
+        for feature in features_to_drop:
+            if feature in list(df.columns):
+                df.drop(columns=feature, inplace=True)
+                
+        if target_variable in list(df.columns):
+            df.drop(columns=target_variable, inplace=True)
+        
+        return df
+
+    def load_counterfactuals():
+        feature_ranges = {'SleepTime': (4,10), 'BMICategory':('Obese (30.0 <= BMI < +Inf)', 'Normal weight (18.5 <= BMI < 25.0)', 'Overweight (25.0 <= BMI < 30.0)')}
+        exp = load("exp.joblib")
+        e1 = exp.generate_counterfactuals(random_features, total_CFs=10, permitted_range=feature_ranges, desired_class="opposite", proximity_weight=1.5, diversity_weight=2.0, features_to_vary=["BMICategory", "Smoking", "SleepTime", "AlcoholDrinking", "DiffWalking","PhysicalActivity", "GenHealth"])
+        cfe_json = json.loads(e1.to_json())        
+        cfe_df = pd.DataFrame(cfe_json['cfs_list'][0],columns=cfe_json['feature_names_including_target'])
+        return cfe_df
+   
+
+    class Droper(BaseEstimator, TransformerMixin):
+        '''
+        Adding a class for custom pipeline step
+        '''
+        def __init__(self, features_to_drop, target_variable):
+                self.features_to_drop = features_to_drop
+                self.target_variable = target_variable
+                
+        def fit(self, X, y):
+                return self
+            
+        def transform(self, X):
+            x = X.copy()
+            return drop_not_wanted_features(x, self.features_to_drop, self.target_variable)
+    
     @st.cache_data(persist=True)
-    def load_dataset() -> pd.DataFrame:
-        # Assuming you have converted your dataset to Parquet format
-        # and updated the DATASET_PATH to point to the .parquet file
-        parquet_file_path = DATASET_PATH  # Update this to your Parquet file path
-        heart_df = pd.read_parquet(parquet_file_path)
-        return heart_df
+    def pregenerate_counterfactual(random_features__):      
+        max_retries = 50 # Maximum number of attempts
+        retries = 0
+        
+        while retries < max_retries:
+            # Attempt to load and parse counterfactuals
+            cfs_list = load_counterfactuals()
+            cfs_list = parse_counterfactuals(random_features, cfs_list)
+            # Check if counterfactuals list is not empty
+            if not cfs_list.empty:  # Assuming cfs_list is a DataFrame; adjust condition if it's a list
+                cfs_list = cfs_list.iloc[0]
+                cfs_list[13] = float(round(cfs_list[13]))
+                counterfactuals_conditions = []
+                feat = pd.DataFrame(random_features).T
+                for i in range(14):
+                    if cfs_list.iloc[i] != feat.iloc[i].iloc[0]:
+                        if i == 1:
+                            counterfactuals_conditions.append({cfs_list.index[i]:"Stop smoking"})
+                        elif i == 2:
+                            counterfactuals_conditions.append({cfs_list.index[i]:"Stop drinking alcohol"})
+                        else:
+                            counterfactuals_conditions.append({cfs_list.index[i]:(cfs_list[i])})
+                return counterfactuals_conditions, cfs_list
+            else:
+                retries += 1
+
+        
+        return None  # or return an empty DataFrame/list as per your design
+    
+    @st.cache_data(persist=True)
+    def generate_probability_prediction(cfs):
+        cf_person = pd.DataFrame(cfs)
+        cf_person.columns = cf_person.columns.astype(str)
+
+        input_df = cf_person
+        df = pd.concat([input_df, heart], axis=0)
+        df = df.drop(columns=["HeartDisease"])
+        cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "DiffWalking",
+                    "Sex", "AgeCategory", "Race", "Diabetic", "PhysicalActivity",
+                    "GenHealth", "Asthma", "KidneyDisease", "SkinCancer"]
+        for cat_col in cat_cols:
+            dummy_col = pd.get_dummies(df[cat_col], prefix=cat_col)
+            df = pd.concat([df, dummy_col], axis=1)
+            del df[cat_col]
+        df = df[:1]
+        df.fillna(0, inplace=True)
+        prediction_prob = log_model.predict_proba(df)
+        prediction_bool = log_model.predict(df)  
+        return round(prediction_prob[0][1] * 100, 2), prediction_bool
+    
+    
+    predicition_prob, prediction_bool = generate_probability_prediction(random_features)
+    counterfactual, cfs_list = pregenerate_counterfactual(random_features)
+    prediction_prob_of_counterfactual = generate_probability_prediction(pd.DataFrame(cfs_list).T)
+    
+    
+
+    
+
+
 
 
 
@@ -170,30 +336,19 @@ if selected == "Dashboard":
         st.subheader(f"Hello, Patient {patient_num}")
         st.markdown("""
                         Welcome to your health dashboard. 
-                        Here you can find all the information about your health. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
-
-    random_features = pd.DataFrame({
-            "BMICategory": [BMI],
-            "Smoking": [smokingcat],
-            "AlcoholDrinking": [alcohol],
-            "Stroke": [strokecat],
-            "PhysicalHealth": [physicalhealth],
-            "MentalHealth": [0],
-            "DiffWalking": [diffwalk],
-            "Sex": [gender],
-            "AgeCategory": [age],
-            "Race": ["White"],
-            "Diabetic": [diabeticcat],
-            "PhysicalActivity": ["No"],
-            "GenHealth": [genhealth],
-            "SleepTime": [sleeptime],
-            "Asthma": [asthma],
-            "KidneyDisease": ["No"],
-            "SkinCancer": ["No"]
-        })
+                        Here you can find all the information about your health. The information is based on a patient profile.""")
+    with col1.container(border=True):
+        st.markdown("<p style='text-align: center; padding:0rem; margin:0rem;' > Your calculated risk is</p>", unsafe_allow_html=True)
+        if(prediction_bool == 0):
+            st.markdown("<h1 style='text-align:center;font-size:2.5rem; padding:0rem; color:green; margin:0rem;'>" + str(predicition_prob) + "%</h1>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;' >Considered Healthy</p>", unsafe_allow_html=True)
+        else:
+            st.markdown("<h1 style='text-align:center;font-size:2.5rem; padding:0rem; color:red; margin:0rem;'>" + str(predicition_prob) + "%</h1>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;' >Considered Unhealthy</p>", unsafe_allow_html=True)
 
 
-    heart = load_dataset()
+
+
 
 
 
@@ -238,10 +393,10 @@ if selected == "Dashboard":
     st.markdown(custom_css, unsafe_allow_html=True)
     with st.sidebar:
         with st.container(border=True):
-            st.markdown("<h2 style='text-align: center;' >Age </h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center;' >Age Group</h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;' >" + age +"<p>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.markdown("<h2 style='text-align: center;' >BMI </h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center;' >BMI Category</h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;' >" + BMI +"<p>", unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown("<h2 style='text-align: center;' >Gender </h2>", unsafe_allow_html=True)
@@ -249,9 +404,14 @@ if selected == "Dashboard":
         with st.container(border=True):
             st.markdown("<h2 style='text-align: center;' >General Health </h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;' >" + genhealth +"<p>", unsafe_allow_html=True)
-        with st.container(border=True):
-            st.markdown("<h2 style='text-align: center;' >Physical Activity </h2>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center;' >" + physicalactivity +"<p>", unsafe_allow_html=True)
+        if physicalactivity == "Yes":
+            with st.container(border=True):
+                st.markdown("<h2 style='text-align: center;' >Physical Activity </h2>", unsafe_allow_html=True)
+                st.markdown("<p style='text-align: center;' >" + "Physically Active" +"<p>", unsafe_allow_html=True)
+        else:
+            with st.container(border=True):
+                st.markdown("<h2 style='text-align: center;' >Physical Activity </h2>", unsafe_allow_html=True)
+                st.markdown("<p style='text-align: center;' >" + "Not Physically Active "+"<p>", unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown("<h2 style='text-align: center;' >Alcoholism </h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;' >" + alcohol +"<p>", unsafe_allow_html=True)
@@ -281,13 +441,14 @@ if selected == "Dashboard":
         st.subheader("Your results")
 
 
-
+    graph_select = None
     with col1.container():
         option = st.selectbox(
             "What Graph would you like to see?",
             ("BMI", "Smoking", "General Health", "Alcohol Drinking", "Stroke", "Difficulty Walking", "Diabetic"),
             placeholder="Select a Graph to display",
         )
+        graph_select = option
 
     # Assuming 'heart' is your DataFrame and 'col1' is a defined Streamlit container
     if option == "BMI":    
@@ -500,161 +661,27 @@ if selected == "Dashboard":
     #############################
     # LangChain ChatGPT
     #############################
-    def parse_counterfactuals(inference_data, cfe_raw):
-        """
-        Apply additonal boundary conditions
-        # BMICategory should not go higher
-        # Sleeptime should be higher or equal
-        # if 0, it should stay as 0 for smoking and alcohol
-        # if 1, it should stay as 1 for physical activity
-        """
-        bmicats = ["Underweight (BMI < 18.5)", "Normal weight (18.5 <= BMI < 25.0)", 
-               "Overweight (25.0 <= BMI < 30.0)", "Obese (30.0 <= BMI < +Inf)"]
-        # Assuming inference_data is a DataFrame and we're interested in the first row
-        initial_bmi_category = inference_data["BMICategory"].iloc[0]
-        initial_sleep_time = float(inference_data["SleepTime"].iloc[0])
-        initial_smoking = inference_data["Smoking"].iloc[0]
-        initial_alcohol = inference_data["AlcoholDrinking"].iloc[0]
-        
-        index_value1 = bmicats.index(initial_bmi_category)
-        
-        # To be dropped indices
-        to_drop = []
-        for ind, row in cfe_raw.iterrows():
-
-            current_index = bmicats.index(row["BMICategory"])
-            if initial_smoking == "No":
-                row["Smoking"] = "No"
-                
-            if initial_alcohol == "No":
-                row["AlcoholDrinking"] = "No"
-            # If current BMI category is higher than the initial, mark for dropping
-            if current_index > index_value1:
-                to_drop.append(ind)
-                continue  # Move to the next row
-            
-            # If SleepTime is not greater or equal to the initial, mark for dropping
-            if float(row["SleepTime"]) < initial_sleep_time:
-                to_drop.append(ind)
-                continue
-            
-            
-        
-        # Drop the rows outside the loop
-        cfe_raw.drop(labels=to_drop, axis=0, inplace=True)
-        cfe_raw.drop_duplicates(subset=None, inplace=True)
-        return cfe_raw
-
-
-
-
-
-
-        #Creating counterfactuals
-    def drop_not_wanted_features(df, features_to_drop, target_variable):
-        '''
-        Function to drop unwanted features
-        '''
-        for feature in features_to_drop:
-            if feature in list(df.columns):
-                df.drop(columns=feature, inplace=True)
-                
-        if target_variable in list(df.columns):
-            df.drop(columns=target_variable, inplace=True)
-        
-        return df
-
-    def load_counterfactuals():
-        feature_ranges = {'SleepTime': (4,10), 'BMICategory':('Obese (30.0 <= BMI < +Inf)', 'Normal weight (18.5 <= BMI < 25.0)', 'Overweight (25.0 <= BMI < 30.0)')}
-        exp = load("exp.joblib")
-        e1 = exp.generate_counterfactuals(random_features, total_CFs=10, permitted_range=feature_ranges, desired_class="opposite", proximity_weight=1.5, diversity_weight=2.0, features_to_vary=["BMICategory", "Smoking", "SleepTime", "AlcoholDrinking", "DiffWalking","PhysicalActivity", "GenHealth"])
-        cfe_json = json.loads(e1.to_json())        
-        cfe_df = pd.DataFrame(cfe_json['cfs_list'][0],columns=cfe_json['feature_names_including_target'])
-        return cfe_df
-   
-
-    class Droper(BaseEstimator, TransformerMixin):
-        '''
-        Adding a class for custom pipeline step
-        '''
-        def __init__(self, features_to_drop, target_variable):
-                self.features_to_drop = features_to_drop
-                self.target_variable = target_variable
-                
-        def fit(self, X, y):
-                return self
-            
-        def transform(self, X):
-            x = X.copy()
-            return drop_not_wanted_features(x, self.features_to_drop, self.target_variable)
     
-    @st.cache_data(persist=True)
-    def pregenerate_counterfactual(random_features__):      
-        max_retries = 50 # Maximum number of attempts
-        retries = 0
-        
-        while retries < max_retries:
-            # Attempt to load and parse counterfactuals
-            cfs_list = load_counterfactuals()
-            cfs_list = parse_counterfactuals(random_features, cfs_list)
-            # Check if counterfactuals list is not empty
-            if not cfs_list.empty:  # Assuming cfs_list is a DataFrame; adjust condition if it's a list
-                cfs_list = cfs_list.iloc[0]
-                cfs_list[13] = float(round(cfs_list[13]))
-                counterfactuals_conditions = []
-                feat = pd.DataFrame(random_features).T
-                for i in range(14):
-                    if cfs_list.iloc[i] != feat.iloc[i].iloc[0]:
-                        counterfactuals_conditions.append({cfs_list.index[i]:(cfs_list[i])})
-                return counterfactuals_conditions, cfs_list
-            else:
-                retries += 1
-
-        
-        return None  # or return an empty DataFrame/list as per your design
-    
-    @st.cache_data(persist=True)
-    def generate_probability_prediction(cfs):
-        cf_person = pd.DataFrame(cfs)
-        cf_person.columns = cf_person.columns.astype(str)
-
-        input_df = cf_person
-        df = pd.concat([input_df, heart], axis=0)
-        df = df.drop(columns=["HeartDisease"])
-        cat_cols = ["BMICategory", "Smoking", "AlcoholDrinking", "Stroke", "DiffWalking",
-                    "Sex", "AgeCategory", "Race", "Diabetic", "PhysicalActivity",
-                    "GenHealth", "Asthma", "KidneyDisease", "SkinCancer"]
-        for cat_col in cat_cols:
-            dummy_col = pd.get_dummies(df[cat_col], prefix=cat_col)
-            df = pd.concat([df, dummy_col], axis=1)
-            del df[cat_col]
-        df = df[:1]
-        df.fillna(0, inplace=True)
-        prediction_prob = log_model.predict_proba(df)  
-        return round(prediction_prob[0][1] * 100, 2)
-    
-    
-    predicition_prob = generate_probability_prediction(random_features)
-    counterfactual, cfs_list = pregenerate_counterfactual(random_features)
-    prediction_prob_of_counterfactual = generate_probability_prediction(pd.DataFrame(cfs_list).T)
 
     
 
     
     @tool
     def generate_counterfactual():
-        """This generates a heart disease counterfactual. The response is shown verbose.""" 
+        """This generates a heart disease counterfactual. If this function is called always ask the person if they want to see the effect on the predicted heart disease risk. The response is shown verbose.""" 
         newline = "\n"
-        return f"""To potentially lower your heart disease risk, here are some changes that could be made based on a counterfactual scenario:
-            {newline.join(f"{cf}" for cf in counterfactual)}
-            These changes are hypothetical scenarios that suggest how certain lifestyle modifications could potentially reduce your heart disease risk. It's important to consult with healthcare professionals before making any significant changes to your lifestyle or health regimen.
+        return f"""
+            {newline.join(f"{cf}" for cf in counterfactual)}"""
+            
 
-            Would you like to see the predicted heart disease risk if these changes were implemented?"""
-
+    @tool
+    def graph_information():
+        """Returns the information of the currently selected graph"""
+        return get_graph(graph_select, BMI, genhealth, strokecat,alcohol, diffwalk, smokingcat, diabeticcat)
 
     @tool
     def prediction_of_heart_disease_risk_of_counterfactual():
-        """Predicts the heart disease risk of a counterfactual. The response is shown verbose."""
+        """Predicts the heart disease risk of the recommend lifestyle changes. The response is shown verbose."""
         return prediction_prob_of_counterfactual
                 
 
@@ -662,12 +689,65 @@ if selected == "Dashboard":
     @tool
     def predict_model() -> int:
         """Predicts the heart disease risk of a patient. The response is shown verbose."""
-        return f"""Your heart disease risk is estimated to be {predicition_prob}%. Are you interested in learning more about how to manage your heart disease risk? Discover what actions you can take and see how your risk projection might change following certain lifestyle adjustments."""
+        return f"""{predicition_prob}"""
         
+    @tool
+    def patient_information():
+        """Returns the patient information. The response is shown verbose."""
+        return f"""Patient Information:
+            - Age Group: {age}
+            - BMI Category: {BMI}
+            - Gender: {gender}
+            - General Health: {genhealth}
+            - Physical Activity: {physicalactivity}
+            - Alcohol Drinking: {alcohol}
+            - Asthma: {asthma}
+            - Difficulty Walking: {diffwalk}
+            - Diabetic: {diabeticcat}
+            - Sleep Time: {sleeptime}
+            - Smoking: {smokingcat}
+            - Stroke: {strokecat}"""
+
+    import enum
+    class BMICategory(enum.Enum):
+        Underweight = "Underweight (BMI < 18.5)"
+        NormalWeight = "Normal weight (18.5 <= BMI < 25.0)"
+        Overweight = "Overweight (25.0 <= BMI < 30.0)"
+        Obese = "Obese (30.0 <= BMI < +Inf)"
+
+    @tool
+    def filter_data_for_BMI_Category(bmi: BMICategory):
+        """Filters the dataset based on the BMI category and returns the amount of rows that satisfy those parameters."""
+        filtered_df = heart[heart["BMICategory"] == bmi.value]
+        return filtered_df.shape[0]
+    
+    @tool
+    def sample_data_set():
+        """Returns 5 random rows from the dataset. Use this when the user asks for information about the dataset. Show it in a proper table and display all values."""
+        return heart.sample(5)
+    
+    @tool
+    def filter_dataset(column_name: str, value: str):
+        """Filters the dataset based on the column name and the given value and returns the amount of rows that satisfy those parameters.
+        Columns Names: - HeartDisease - BMICategory - Smoking - AlcoholDrinking - Stroke - PhysicalHealth - MentalHealth - DiffWalking - PhysicalActivity - GenHealth - SleepTime - Asthma - Diabetic - KidneyDisease - SkinCancer
+        Smoking, AlcoholDrinking, Stroke, PhysicalActivity, Diabetic, DiffWalking, KidneyDisease, SkinCancer is: - Yes - No
+        GenHealth is: - Poor - Fair - Good - Very good - Excellent
+        AgeCategory is: - 18-24 - 25-29 - 30-34 - 35-39 - 40-44 - 45-49 - 50-54 - 55-59 - 60-64 - 65-69 - 70-74 - 75-79 - 80 or older
+        PhysicalHealth, MentalHealth, SleepTime is a number."""
+        filtered_df = heart[heart[column_name] == value]
+        return filtered_df.shape[0]
+    
+    @tool
+    def return_accuracy():
+        """Returns the accuracy of the prediction model"""
+        return 0.9144
+    
     
 
+
+    
     model = ChatOpenAI(model="gpt-4-0125-preview", temperature=0, api_key=st.secrets["OPENAI_API_KEY"], streaming=True)
-    tools = [predict_model, generate_counterfactual, prediction_of_heart_disease_risk_of_counterfactual]
+    tools = [predict_model, generate_counterfactual, prediction_of_heart_disease_risk_of_counterfactual, patient_information, graph_information, filter_data_for_BMI_Category, filter_dataset, sample_data_set, return_accuracy]
     ## add session state to fix memory issue
     if "memory" not in st.session_state:
         st.session_state["memory"] = ConversationBufferMemory(memory_key="chat_history",return_messages=True,)
@@ -685,49 +765,90 @@ if selected == "Dashboard":
             
     #     ]
     # )
-    prompt = hub.pull("hwchase17/openai-tools-agent")
-    agent = create_openai_tools_agent(model, tools, prompt)
-    agent_executor  = AgentExecutor(
-    agent=agent, tools=tools, verbose=True
-
+    # @st.cache_resource()
+    def create_agent():
+        prompt = hub.pull("hwchase17/openai-tools-agent")
+        agent = create_openai_tools_agent(model, tools, prompt)
+        agent_executor  = AgentExecutor(
+        agent=agent, tools=tools, verbose=True
+         )
+        return agent_executor
+    agent_executor = create_agent()
+    
+    st.markdown(
+        """
+    <style>
+    button {
+        height: 3rem;
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+    }
+    </style>
+    """,
+        unsafe_allow_html=True,
     )
-    
-    
-    marker_text = "unique_marker_for_height_adjustment"
-
     with col2.container(border=True):
-        st.markdown(f"<!-- {marker_text} -->", unsafe_allow_html=True)
 
         st.subheader("Your Heart Health Assistant")
-        st.markdown("<p>Feel free to pose any questions regarding your risk of heart diseases. The AI will try to provide answers to the best of its capabilities. As a starting point, you might ask about your heart disease risk.</p>", unsafe_allow_html=True)
-        history = st.container(height=400, border = False)
-        yeet = st.chat_input("What is my heart disease risk?")
+        st.markdown("<p>Feel free to pose any questions regarding your risk of heart diseases. The AI will try to provide answers to the best of its capabilities. As a starting point, you can press one of the buttons below.</p>", unsafe_allow_html=True)
         if "messages" not in st.session_state:
-            st.session_state.messages = [{"role": "assistant", "content": "Hello! How can I assist you today? I can answer all your questions about your heart disease risk. Als je mij aanspreekt in het Nederlands, kan ik je ook in het Nederlands antwoorden."}]
+            st.session_state.messages = [{"role":"system", "content":"You are a helpful heart risk assessment assistant. You are also a causal agent. You answer warm, verbose, inviting but professional like a doctor. You always ask heart disease related follow up questions, Do not ask for personal data, only use the data supplied to you throught the tools, Use pretty formatting for everything." },
+                                         {"role": "assistant", "content": "Hello! How can I assist you today? I can answer all your questions about your heart disease risk. Als je mij aanspreekt in het Nederlands, kan ik je ook in het Nederlands antwoorden."}]
+        butcol1, butcol2, butcol3 = st.columns([1,1,1])
+        button1 = butcol1.button("What's my heart disease risk?", use_container_width=True)
+            
+        button2 = butcol2.button("How do I decrease my risk?",use_container_width=True )
+        button3 =butcol3.button("Simulate health improvements", use_container_width = True)
+        history = st.container(height=500)
+        yeet = st.chat_input("What is my heart disease risk?")
+        
 
         for message in st.session_state.messages:
-            with history.chat_message(message["role"]):
-                st.markdown(message["content"])
-
+            if message["role"] != "system":
+                with history.chat_message(message["role"]):
+                    st.markdown(message["content"])
+        if button1:
+            with history.chat_message("user"):
+                st.write("What's my heart disease risk?")
+            with history.chat_message("assistant"):
+                st.session_state.messages.append({"role": "user", "content": "What's my heart disease risk?"})
+                with st.spinner("Thinking..."):
+                    response = agent_executor.invoke({"input": "What's my heart disease risk?",
+                                                    "chat_history": st.session_state.messages} )
+                st.write(response["output"]) 
+                st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+        if button2:
+            with history.chat_message("user"):
+                st.write("What can I do about my heart disease risk?")
+            with history.chat_message("assistant"):
+                st.session_state.messages.append({"role": "user", "content": "What can I do about my heart disease risk?"})
+                with st.spinner("Thinking..."):
+                    response = agent_executor.invoke({"input": "What can I do about my heart disease risk?",
+                                                    "chat_history": st.session_state.messages} )
+                st.write(response["output"]) 
+                st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+        if button3:
+            with history.chat_message("user"):
+                st.write("What's my heart disease risk after the improvements?")
+            with history.chat_message("assistant"):
+                st.session_state.messages.append({"role": "user", "content": "What's my heart disease risk after the improvements?"})
+                with st.spinner("Thinking..."):
+                    response = agent_executor.invoke({"input": "What's my heart disease risk after the improvements?",
+                                                    "chat_history": st.session_state.messages} )
+                st.write(response["output"]) 
+                st.session_state.messages.append({"role": "assistant", "content": response["output"]})
         if prompt := yeet:
             st.session_state.messages.append({"role": "user", "content": prompt})
             with history.chat_message("user"):
                 st.markdown(prompt)
+            
             with history.chat_message("assistant"):
                 with st.spinner("Thinking..."):
                     response = agent_executor.invoke({"input": prompt,
                                                       "chat_history": st.session_state.messages} )
                     st.write(response["output"])
             st.session_state.messages.append({"role": "assistant", "content": response["output"]})
-    
-    st.markdown(f"""
-    <style>
-        /* Target the marker's parent container */
-        .element-container:has(> :contains('{marker_text}')) {{
-            height: 75vh !important;
-        }}
-    </style>
-""", unsafe_allow_html=True)
+
 
 
 
