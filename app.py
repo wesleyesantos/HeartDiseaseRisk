@@ -923,7 +923,7 @@ if selected == "Dashboard":
             
     if st.secrets["PROD"] == "True":
         streamlit_analytics.stop_tracking(save_to_json=f"analytics/{st.session_state.user_id}.json")
-        db = firestore.Client.from_service_account_json(firestore_cred)
+        db = firestore.Client.from_service_account_info(firestore_cred)
         doc_ref = db.collection('users').document(str(st.session_state.user_id))
         analytics_data = pd.read_json(f"analytics/{st.session_state.user_id}.json")
         doc_ref.set(analytics_data.to_dict())
