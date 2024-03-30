@@ -103,6 +103,8 @@ if selected == "Dashboard":
         else:
             main.reset_counts()
             streamlit_analytics.start_tracking()
+    else:
+        streamlit_analytics.start_tracking()
 
 
     
@@ -817,20 +819,22 @@ if selected == "Dashboard":
     """,
         unsafe_allow_html=True,
     )
-    with col2.container(border=True):
 
+    with col2.container(border=True):
         st.subheader("Your Heart Health Assistant")
         st.markdown("<p>Feel free to pose any questions regarding your risk of heart diseases. The AI will try to provide answers to the best of its capabilities. As a starting point, you can press one of the buttons below.</p>", unsafe_allow_html=True)
         if "messages" not in st.session_state:
             st.session_state.messages = [{"role":"system", "content":"You are a helpful heart risk assessment assistant. You are also a causal agent. You answer warm, verbose, inviting but professional like a doctor. You always ask heart disease related follow up questions, Do not ask for personal data, only use the data supplied to you throught the tools, Use pretty formatting for everything." },
                                          {"role": "assistant", "content": "Hello! How can I assist you today? I can answer all your questions about your heart disease risk. Als je mij aanspreekt in het Nederlands, kan ik je ook in het Nederlands antwoorden."}]
         butcol1, butcol2, butcol3 = st.columns([1,1,1])
-        button1 = butcol1.button("What's my heart disease risk?", use_container_width=True)
-            
-        button2 = butcol2.button("How do I decrease my risk?",use_container_width=True )
-        button3 =butcol3.button("Simulate health improvements", use_container_width = True)
+        with butcol1.container():
+            button1 = st.button("What's my heart disease risk?", use_container_width=True)
+        with butcol2.container():
+            button2 = st.button("How do I decrease my risk?",use_container_width=True )
+        with butcol3.container():
+            button3 =st.button("Simulate health improvements", use_container_width = True)
         history = st.container(height=500)
-        chat_input = st.chat_input("What is my heart disease risk?")
+        chat_input = st.chat_input("Assistant, What is my heart disease risk?")
         
         
 
@@ -839,35 +843,11 @@ if selected == "Dashboard":
                 with history.chat_message(message["role"]):
                     st.markdown(message["content"])
         if button1:
-            with history.chat_message("user"):
-                st.write("What's my heart disease risk?")
-            with history.chat_message("assistant"):
-                st.session_state.messages.append({"role": "user", "content": "What's my heart disease risk?"})
-                with st.spinner("Thinking..."):
-                    response = agent_executor.invoke({"input": "What's my heart disease risk?",
-                                                    "chat_history": st.session_state.messages} )
-                st.write(response["output"]) 
-                st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+            chat_input = "What is my heart disease risk?"
         if button2:
-            with history.chat_message("user"):
-                st.write("What can I do about my heart disease risk?")
-            with history.chat_message("assistant"):
-                st.session_state.messages.append({"role": "user", "content": "What can I do about my heart disease risk?"})
-                with st.spinner("Thinking..."):
-                    response = agent_executor.invoke({"input": "What can I do about my heart disease risk?",
-                                                    "chat_history": st.session_state.messages} )
-                st.write(response["output"]) 
-                st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+            chat_input = "What can I do about my heart disease risk?"
         if button3:
-            with history.chat_message("user"):
-                st.write("What's my heart disease risk after the improvements?")
-            with history.chat_message("assistant"):
-                st.session_state.messages.append({"role": "user", "content": "What's my heart disease risk after the improvements?"})
-                with st.spinner("Thinking..."):
-                    response = agent_executor.invoke({"input": "What's my heart disease risk after the improvements?",
-                                                    "chat_history": st.session_state.messages} )
-                st.write(response["output"]) 
-                st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+            chat_input = "What's my heart disease risk after the improvements?"
         if prompt := chat_input:
             st.session_state.messages.append({"role": "user", "content": prompt})
             with history.chat_message("user"):
@@ -880,46 +860,6 @@ if selected == "Dashboard":
                     st.write(response["output"])
             st.session_state.messages.append({"role": "assistant", "content": response["output"]})
     
-    # if "chat_input" and "patient_num" and "option" in st.session_state:
-    #     if doc_ref.get().exists:
-    #         if st.session_state.chat_input != chat_input and chat_input != None:
-    #             if chat_input in doc_ref.get().to_dict()['Chat']:
-    #                 doc_ref.update({
-    #                     'Chat': {chat_input:doc_ref.get().to_dict()['Chat'][chat_input] + 1},
-    #                 })
-    #             else:
-    #                 doc_ref.update({
-    #                     'Chat': {chat_input:1},
-    #                 })
-                
-    #         if st.session_state.option != option:
-    #             if option in doc_ref.get().to_dict()['Graph_Interaction']:
-    #                 doc_ref.update({
-    #                     'Graph_Interaction': {option: doc_ref.get().to_dict()['Graph_Interaction'][option] + 1},
-    #                 })
-    #             else:
-    #                 doc_ref.update({
-    #                     'Graph_Interaction': {option: 1},
-    #                 })
-    #         if st.session_state.patient_num != patient_num:
-    #             if patient_num in doc_ref.get().to_dict()['Patient']:
-    #                 doc_ref.update({
-    #                     'Patient': {patient_num: doc_ref.get().to_dict()['Patient'][patient_num] + 1},
-    #                 })
-    #             else:
-    #                 doc_ref.update({
-    #                     'Patient': {patient_num: 1},
-    #                 })
-    #     else:
-
-    #         doc_ref.set({
-    #             'Chat':{},
-    #             'Graph_Interaction': {option: 1},
-    #             'Patient': {patient_num: 1},
-    #     })
-    # st.session_state["chat_input"] = chat_input
-    # st.session_state["patient_num"] = patient_num
-    # st.session_state["option"] = option
             
     if st.secrets["PROD"] == "True":
         streamlit_analytics.stop_tracking(save_to_json=f"analytics/{st.session_state.user_id}.json")
@@ -927,6 +867,8 @@ if selected == "Dashboard":
         doc_ref = db.collection('users').document(str(st.session_state.user_id))
         analytics_data = pd.read_json(f"analytics/{st.session_state.user_id}.json")
         doc_ref.set(analytics_data.to_dict())
+    else:
+        streamlit_analytics.stop_tracking()
 
     
 
