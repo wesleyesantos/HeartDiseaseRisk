@@ -14,8 +14,7 @@ from streamlit_option_menu import option_menu
 from helperfunctions import *
 from langchain.tools import BaseTool, StructuredTool, tool
 from sklearn.base import BaseEstimator, TransformerMixin
-
-
+import os
 # from joblib import load
 import pandas as pd
 from langchain.pydantic_v1 import BaseModel, Field
@@ -27,11 +26,32 @@ from langchain.memory import ChatMessageHistory
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 import streamlit_analytics2 as streamlit_analytics
+from streamlit_analytics2 import main
+
+import uuid
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin.exceptions import FirebaseError
+from google.cloud import firestore
+
+firestore_string = st.secrets["FIRESTORE"]
+firestore = json.loads(firestore_string)
+cred = credentials.Certificate(firestore)
+try:
+    firebase_admin.get_app()  # Attempt to get the default app
+except ValueError as e:  # If it doesn't exist, initialize it
+    firebase_admin.initialize_app(cred)
+
+
+# Add a new user to the database
 
 
 
 st.set_page_config(layout="wide", page_title="Heart Chatbot", page_icon=":anatomical_heart:")
-streamlit_analytics.start_tracking()
+
+if 'user_id' not in st.session_state:
+    # Generate a unique user ID and store it in the session state
+    st.session_state['user_id'] = str(uuid.uuid4())
 
 selected = option_menu(
     menu_title=None,
@@ -65,15 +85,25 @@ st.markdown(
 # float_init(theme=True, include_unstable_primary=False)
 
 if selected == "Home":
-    col1, col2 = st.columns([1, 2])
+    col1, colcol2= st.columns([1,2])
+    _, col2,_ = colcol2.columns([0.01,2,1.3])
+
     col2.title("Heart Health Advisor")
     col2.subheader("Welcome to the Heart Risk Assessment Tool")
-    col2.markdown("""This tool aims to assist you in comprehending your risk of heart disease. Currently, rather than utilizing your personal information to evaluate heart disease risk, the tool employs data from a preset patient profile. This approach is adopted because handling confidential information necessitates extensive approvals from regulatory bodies. To interact with the Chatbot, please navigate to the dashboard. While you can inquire about various topics, for optimal results, we recommend focusing your questions on heart disease risk. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population
-    """)
+    col2.markdown("""This tool aims to assist you in comprehending your risk of heart disease. Currently, rather than utilizing your personal information to evaluate heart disease risk, the tool employs data from a preset patient profile. This approach is adopted because handling confidential information necessitates extensive approvals from regulatory bodies.""")
+    col2.markdown(""" To interact with the Chatbot, please navigate to the dashboard. While you can inquire about various topics, for optimal results, we recommend focusing your questions on heart disease risk. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
     with col1.container():
-        st.image("images/handholding.png")
+        st.image("images/handholding1.png")
 
 if selected == "Dashboard":
+    
+    if st.secrets["PROD"] == "True":
+        if os.path.exists(f"analytics/{st.session_state.user_id}.json"):
+            streamlit_analytics.start_tracking(load_from_json=f"analytics/{st.session_state.user_id}.json")
+        else:
+            main.reset_counts()
+            streamlit_analytics.start_tracking()
+
 
     
     DATASET_PATH = "heart_2020_cleaned.parquet"
@@ -800,7 +830,8 @@ if selected == "Dashboard":
         button2 = butcol2.button("How do I decrease my risk?",use_container_width=True )
         button3 =butcol3.button("Simulate health improvements", use_container_width = True)
         history = st.container(height=500)
-        yeet = st.chat_input("What is my heart disease risk?")
+        chat_input = st.chat_input("What is my heart disease risk?")
+        
         
 
         for message in st.session_state.messages:
@@ -837,7 +868,7 @@ if selected == "Dashboard":
                                                     "chat_history": st.session_state.messages} )
                 st.write(response["output"]) 
                 st.session_state.messages.append({"role": "assistant", "content": response["output"]})
-        if prompt := yeet:
+        if prompt := chat_input:
             st.session_state.messages.append({"role": "user", "content": prompt})
             with history.chat_message("user"):
                 st.markdown(prompt)
@@ -848,8 +879,56 @@ if selected == "Dashboard":
                                                       "chat_history": st.session_state.messages} )
                     st.write(response["output"])
             st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+    
+    # if "chat_input" and "patient_num" and "option" in st.session_state:
+    #     if doc_ref.get().exists:
+    #         if st.session_state.chat_input != chat_input and chat_input != None:
+    #             if chat_input in doc_ref.get().to_dict()['Chat']:
+    #                 doc_ref.update({
+    #                     'Chat': {chat_input:doc_ref.get().to_dict()['Chat'][chat_input] + 1},
+    #                 })
+    #             else:
+    #                 doc_ref.update({
+    #                     'Chat': {chat_input:1},
+    #                 })
+                
+    #         if st.session_state.option != option:
+    #             if option in doc_ref.get().to_dict()['Graph_Interaction']:
+    #                 doc_ref.update({
+    #                     'Graph_Interaction': {option: doc_ref.get().to_dict()['Graph_Interaction'][option] + 1},
+    #                 })
+    #             else:
+    #                 doc_ref.update({
+    #                     'Graph_Interaction': {option: 1},
+    #                 })
+    #         if st.session_state.patient_num != patient_num:
+    #             if patient_num in doc_ref.get().to_dict()['Patient']:
+    #                 doc_ref.update({
+    #                     'Patient': {patient_num: doc_ref.get().to_dict()['Patient'][patient_num] + 1},
+    #                 })
+    #             else:
+    #                 doc_ref.update({
+    #                     'Patient': {patient_num: 1},
+    #                 })
+    #     else:
 
+    #         doc_ref.set({
+    #             'Chat':{},
+    #             'Graph_Interaction': {option: 1},
+    #             'Patient': {patient_num: 1},
+    #     })
+    # st.session_state["chat_input"] = chat_input
+    # st.session_state["patient_num"] = patient_num
+    # st.session_state["option"] = option
+            
+    if st.secrets["PROD"] == "True":
+        streamlit_analytics.stop_tracking(save_to_json=f"analytics/{st.session_state.user_id}.json")
+        db = firestore.Client.from_service_account_json(firestore)
+        doc_ref = db.collection('users').document(str(st.session_state.user_id))
+        analytics_data = pd.read_json(f"analytics/{st.session_state.user_id}.json")
+        doc_ref.set(analytics_data.to_dict())
 
+    
 
 
 if selected == "About":
@@ -863,4 +942,6 @@ if selected == "About":
     with col1.container():
         st.image("images/handholding.png")
 
-streamlit_analytics.stop_tracking()
+
+
+

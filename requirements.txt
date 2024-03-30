@@ -15,3 +15,5 @@ langchainhub
 langchain
 langchain_openai
 streamlit-analytics2
+streamlit-cookies-controller
+firebase_admin
