@@ -91,7 +91,7 @@ if selected == "Home":
     col2.title("Heart Health Advisor")
     col2.subheader("Welcome to the Heart Risk Assessment Tool")
     col2.markdown("""This tool aims to assist you in comprehending your risk of heart disease. Currently, rather than utilizing your personal information to evaluate heart disease risk, the tool employs data from a preset patient profile. This approach is adopted because handling confidential information necessitates extensive approvals from regulatory bodies.""")
-    col2.markdown(""" To interact with the Chatbot, please navigate to the dashboard. While you can inquire about various topics, for optimal results, we recommend focusing your questions on heart disease risk. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
+    col2.markdown(""" To interact with the Chatbot, please navigate to the dashboard. While you can inquire about various topics, for optimal results, we recommend focusing your questions on heart disease risk. You can find 3 recommend questions above the chatbot. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
     with col1.container():
         st.image("images/handholding1.png")
 
