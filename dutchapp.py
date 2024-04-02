@@ -122,7 +122,7 @@ if selected == "Dashboard":
     #Gets random row from the dataset
     total_rows= 319796
     st.sidebar.image('pictures/stock_placeholder.jpg', width=100)
-    st.sidebar.markdown("<h1 style='text-align: center;' >Patient </h1>", unsafe_allow_html=True)
+    st.sidebar.markdown("<h1 style='text-align: center;' >patiënt</h1>", unsafe_allow_html=True)
 
     @st.cache_data(persist=True)
     def load_dataset() -> pd.DataFrame:
@@ -135,7 +135,7 @@ if selected == "Dashboard":
 
 
     option = st.sidebar.selectbox(
-    'Patient',
+    'Patiënt',
     ('44', '222460','128868'), index=1, label_visibility="collapsed")
     if(option == '44'):
         num = 2
@@ -372,7 +372,7 @@ if selected == "Dashboard":
         
     col1, col2 = st.columns([2,3])
     with col1.container(border=True):
-        st.subheader(f"Hello, Patient {patient_num}")
+        st.subheader(f"Hallo, Patiënt {patient_num}")
         st.markdown("""
                         Welkom op de gezondheidsdashboard. Hier vindt u alle informatie over de gezondheid van een patiënt.""")
     with col1.container(border=True):
