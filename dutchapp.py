@@ -55,7 +55,7 @@ if 'user_id' not in st.session_state:
 
 selected = option_menu(
     menu_title=None,
-    options=["Home", "Dashboard", "About"],
+    options=["Home", "Dashboard", "Contact"],
     icons=["house", "speedometer2", "envelope"],
     menu_icon="cast",
     orientation="horizontal",
@@ -93,12 +93,13 @@ if selected == "Home":
     col2.markdown("""Deze tool is bedoeld om u te helpen uw risico op hartziekten te begrijpen. Momenteel gebruikt de tool, in plaats van uw persoonlijke informatie, 
                   gegevens van een vooraf ingesteld patiëntenprofiel om het risico op hartziekten te evalueren. 
                   Deze aanpak wordt gehanteerd omdat het verwerken van vertrouwelijke informatie uitgebreide goedkeuringen van regelgevende instanties vereist.""")
-    col2.markdown("""Hier vindt u de stappen die u moet volgen voor mee te doen aan de studie.
+    col2.markdown("""Hier vindt u de stappen die u moet volgen voor uw deelname aan de studie.
 - Open de volgende link: https://forms.gle/mB72msJEQmGYAEHn7
 - Vul de eerste pagina van het formulier in
-- Om de tweede pagina van het formulier in te vullen gaat u het dashboard nodig hebben. U kan het dashboard openen door op de knop "Dashboard" te klikken op deze site. Daarna U vindt de chatbot rechts onderaan.
+- Om de tweede pagina van het formulier in te vullen gaat u het dashboard nodig hebben. U kan het dashboard openen door op de knop "Dashboard" te klikken op deze site hierboven. Daarna U vindt de chatbot rechts onderaan.
 - Beantwoord alle vragen met behulp van de chatbot, aarzel niet om een goede conversatie te hebben met de chatbot. 
-- Als u klaar bent met het invullen van het formulier, klik dan op "Verzenden" om uw antwoorden in te dienen.""")                      
+- Als u klaar bent met het invullen van het formulier, klik dan op "Verzenden" om uw antwoorden in te dienen.
+- Als u vragen kan u ons altijd bereiken via de contact pagina rechtsboven""")                      
 
     with col1.container():
         st.image("images/handholding1.png")
