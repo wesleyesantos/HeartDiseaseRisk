@@ -95,11 +95,12 @@ if selected == "Home":
                   Deze aanpak wordt gehanteerd omdat het verwerken van vertrouwelijke informatie uitgebreide goedkeuringen van regelgevende instanties vereist.""")
     col2.markdown("""Hier vindt u de stappen die u moet volgen voor uw deelname aan de studie.
 - Open de volgende link: https://forms.gle/mB72msJEQmGYAEHn7
-- Vul de eerste pagina van het formulier in
-- Om de tweede pagina van het formulier in te vullen gaat u het dashboard nodig hebben. U kan het dashboard openen door op de knop "Dashboard" te klikken hierboven op deze pagina. Daarna U vindt de chatbot rechts onderaan.
-- Beantwoord alle vragen met behulp van de chatbot, aarzel niet om een goede conversatie te hebben met de chatbot. 
+- Vul de <u>eerste</u> pagina van het formulier in
+- Om de <u>tweede</u> pagina van het formulier in te vullen gaat u het dashboard nodig hebben. U kan het dashboard openen door op de knop "Dashboard" te klikken hierboven op deze pagina. Daarna U vindt de chatbot rechts onderaan.
+- Beantwoord alle vragen op de <u>tweede</u> pagina van het formulier met behulp van de chatbot, aarzel niet om een goede conversatie te hebben met de chatbot. 
+- Voor de derde en vierde pagina heeft u de chatbot niet meer nodig en kan u het formulier gewoon verder invullen.
 - Als u klaar bent met het invullen van het formulier, klik dan op "Verzenden" om uw antwoorden in te dienen.
-- Als u vragen kan u ons altijd bereiken via de contact pagina rechtsboven""")                      
+- Als u vragen heeft kan u ons altijd bereiken via de contact pagina rechtsboven""", unsafe_allow_html=True)                      
 
     with col1.container():
         st.image("images/handholding1.png")
