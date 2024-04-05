@@ -882,7 +882,7 @@ if selected == "Dashboard":
     
 
 
-if selected == "About":
+if selected == "Contact":
     col1, col2, _ = st.columns([1, 2,1])
     with col2.container(border=True):
         st.subheader("Contact Informatie")
