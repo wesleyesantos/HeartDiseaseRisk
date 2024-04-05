@@ -96,7 +96,7 @@ if selected == "Home":
     col2.markdown("""Hier vindt u de stappen die u moet volgen voor uw deelname aan de studie.
 - Open de volgende link: https://forms.gle/mB72msJEQmGYAEHn7
 - Vul de <u>eerste</u> pagina van het formulier in
-- Om de <u>tweede</u> pagina van het formulier in te vullen gaat u het dashboard nodig hebben. U kan het dashboard openen door op de knop "Dashboard" te klikken hierboven op deze pagina. Daarna U vindt de chatbot rechts onderaan.
+- Om de <u>tweede</u> pagina van het formulier in te vullen gaat u het dashboard nodig hebben. U kan het dashboard openen door op de knop "Dashboard" te klikken hierboven op deze pagina. Daarna vindt u de chatbot rechts onderaan.
 - Beantwoord alle vragen op de <u>tweede</u> pagina van het formulier met behulp van de chatbot, aarzel niet om een goede conversatie te hebben met de chatbot. 
 - Voor de derde en vierde pagina heeft u de chatbot niet meer nodig en kan u het formulier gewoon verder invullen.
 - Als u klaar bent met het invullen van het formulier, klik dan op "Verzenden" om uw antwoorden in te dienen.
@@ -833,7 +833,7 @@ if selected == "Dashboard":
         st.subheader("Uw Hartziekte Chatbot")
         st.markdown("<p>Voel u vrij om hieronder vragen te stellen over uw risico op hartziekten. De chatbot zal proberen om antwoorden te geven naar beste kunnen. Als startpunt kunt u op een van de onderstaande knoppen drukken.</p>", unsafe_allow_html=True)
         if "messages" not in st.session_state:
-            st.session_state.messages = [{"role":"system", "content":"Je bent een behulpzame assistent voor het beoordelen van hartziekterisico's. Je bent ook een causale agent. Je antwoordt warm, uitgebreid, uitnodigend maar professioneel als een dokter. Je stelt altijd opvolgvragen gerelateerd aan hartziekten, vraagt niet om persoonlijke gegevens, gebruikt alleen de gegevens die je via de tools hebt gekregen, en gebruikt mooie opmaak voor alles. Je antwoordt voornamelijk in het nederlands" },
+            st.session_state.messages = [{"role":"system", "content":"Je bent een behulpzame assistent voor het beoordelen van hartziekterisico's. Je bent ook een causale agent. Je antwoordt warm, uitgebreid, uitnodigend maar professioneel als een dokter. Je stelt altijd opvolgvragen gerelateerd aan hartziekten, vraagt niet om persoonlijke gegevens, gebruikt alleen de gegevens die je via de tools hebt gekregen, en gebruikt mooie opmaak voor alles. Je antwoordt voornamelijk in het nederlands. Weet dat je soms vragen gaat krijgen over de patiënt, deze gaan nog altijd " },
                                          {"role": "assistant", "content": "Hallo! Hoe kan ik u vandaag helpen? Ik kan al uw vragen over uw risico op hartziekten beantwoorden."}]
         butcol1, butcol2, butcol3 = st.columns([1,1,1])
         with butcol1.container():
