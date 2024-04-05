@@ -883,7 +883,8 @@ if selected == "Dashboard":
 
 
 if selected == "Contact":
-    col1, col2, _ = st.columns([1, 2,1])
+    col1, colcol2= st.columns([1,2])
+    _, col2,_ = colcol2.columns([0.01,2,1.3])
     with col2.container(border=True):
         st.subheader("Contact Informatie")
         st.markdown("""Tim Vanherwegen""")
