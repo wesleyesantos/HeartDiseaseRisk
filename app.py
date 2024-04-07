@@ -882,7 +882,7 @@ if selected == "About":
         st.markdown("tim.vanherwegen.tv@gmail.com")
 
     with col1.container():
-        st.image("images/handholding.png")
+        st.image("images/handholding1.png")
 
 
 
