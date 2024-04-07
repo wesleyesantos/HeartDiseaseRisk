@@ -55,7 +55,7 @@ if 'user_id' not in st.session_state:
 
 selected = option_menu(
     menu_title=None,
-    options=["Home", "Dashboard", "About"],
+    options=["Home", "Dashboard", "Contact"],
     icons=["house", "speedometer2", "envelope"],
     menu_icon="cast",
     orientation="horizontal",
@@ -90,8 +90,17 @@ if selected == "Home":
 
     col2.title("Heart Health Advisor")
     col2.subheader("Welcome to the Heart Risk Assessment Tool")
-    col2.markdown("""This tool aims to assist you in comprehending your risk of heart disease. Currently, rather than utilizing your personal information to evaluate heart disease risk, the tool employs data from a preset patient profile. This approach is adopted because handling confidential information necessitates extensive approvals from regulatory bodies.""")
-    col2.markdown(""" To interact with the Chatbot, please navigate to the dashboard. While you can inquire about various topics, for optimal results, we recommend focusing your questions on heart disease risk. You can find 3 recommend questions above the chatbot. Disclaimer, the information you can find here is based on a sample of 319,796 people thus the data might not represent the entire population""")
+    col2.markdown("""This tool is designed to help you understand your risk of heart disease. Currently, the tool uses data from a preset patient profile to assess the risk of heart disease, instead of your personal information. 
+              This approach is used because processing confidential information requires extensive approvals from regulatory bodies.""")
+    col2.markdown("""Here you will find the steps you need to follow to participate in the study.
+- Open the following link: https://forms.gle/mB72msJEQmGYAEHn7
+- Fill in the <u>first</u> page of the form
+- To fill in the <u>second</u> page of the form, you will need the dashboard. You can access the dashboard by clicking on the "Dashboard" button at the top of this page. Then, you will find the chatbot at the bottom right.
+- Answer all the questions on the <u>second</u> page of the form using the chatbot, do not hesitate to have a good conversation with the chatbot.
+- For the third and fourth page, you will not need the chatbot and can simply continue to fill in the form.
+- When you have finished filling out the form, click "Submit" to submit your answers.
+- If you have any questions, you can always reach us via the contact page at the top right""", unsafe_allow_html=True)
+    
     with col1.container():
         st.image("images/handholding1.png")
 
@@ -873,8 +882,9 @@ if selected == "Dashboard":
     
 
 
-if selected == "About":
-    col1, col2, _ = st.columns([1, 2,1])
+if selected == "Contact":
+    col1, colcol2= st.columns([1,2])
+    _, col2,_ = colcol2.columns([0.01,2,1.3])    
     with col2.container(border=True):
         st.subheader("Contact Information")
         st.markdown("""Tim Vanherwegen""")
