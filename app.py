@@ -93,7 +93,7 @@ if selected == "Home":
     col2.markdown("""This tool is designed to help you understand your risk of heart disease. Currently, the tool uses data from a preset patient profile to assess the risk of heart disease, instead of your personal information. 
               This approach is used because processing confidential information requires extensive approvals from regulatory bodies.""")
     col2.markdown("""Here you will find the steps you need to follow to participate in the study.
-- Open the following link: https://forms.gle/mB72msJEQmGYAEHn7
+- Open the following link: https://forms.gle/KtEdiEhJCywCBUGW8
 - Fill in the <u>first</u> page of the form
 - To fill in the <u>second</u> page of the form, you will need the dashboard. You can access the dashboard by clicking on the "Dashboard" button at the top of this page. Then, you will find the chatbot at the bottom right.
 - Answer all the questions on the <u>second</u> page of the form using the chatbot, do not hesitate to have a good conversation with the chatbot.
