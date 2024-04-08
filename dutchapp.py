@@ -843,7 +843,7 @@ if selected == "Dashboard":
         with butcol3.container():
             button3 =st.button("Simuleer mijn verbeteringen", use_container_width = True)
         history = st.container(height=500)
-        chat_input = st.chat_input("Assistant, What is my heart disease risk?")
+        chat_input = st.chat_input("Assistent, Wat is mijn hartziekte risico?")
         
         
 
